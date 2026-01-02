@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Canvas from '../components/Canvas';
 import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
@@ -7,8 +7,6 @@ import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
  * Página Board - Maneja el estado del tablero
  * 
  * URL: /board/:id?token=xxx
- * 
- * Usa actualizaciones optimistas para UI instantánea
  */
 export default function Board() {
   const { id } = useParams();
@@ -44,10 +42,9 @@ export default function Board() {
     loadBoard();
   }, [id, token]);
 
-  // ============================================
-  // CREAR NOTA
-  // ============================================
-  const handleCreateNote = useCallback(async (x, y) => {
+  // === Handlers ===
+
+  const handleCreateNote = async (x, y) => {
     try {
       const newNote = await createNote(token, {
         board_id: parseInt(id),
@@ -59,79 +56,52 @@ export default function Board() {
       console.error('Error al crear nota:', err);
       alert('Error al crear nota: ' + err.message);
     }
-  }, [id, token]);
+  };
 
-  // ============================================
-  // ACTUALIZAR NOTA - OPTIMISTA
-  // ============================================
-  const handleUpdateNote = useCallback((noteId, updates) => {
-    // 1. Actualizar estado local INMEDIATAMENTE
-    setNotes(prev => 
-      prev.map(note => 
-        note.id === noteId 
-          ? { ...note, ...updates }
-          : note
-      )
-    );
+  const handleUpdateNote = async (noteId, updates) => {
+    try {
+      const updatedNote = await updateNote(token, noteId, updates);
+      setNotes(prev => 
+        prev.map(note => note.id === noteId ? updatedNote : note)
+      );
+    } catch (err) {
+      console.error('Error al actualizar nota:', err);
+      // Revertir cambios locales recargando el tablero
+      const data = await getBoard(id, token);
+      setNotes(data.notes || []);
+    }
+  };
 
-    // 2. Persistir en background (no bloqueamos UI)
-    updateNote(token, noteId, updates)
-      .catch(err => {
-        console.error('Error al persistir nota:', err);
-        // Recargar estado real si hay error
-        getBoard(id, token)
-          .then(data => setNotes(data.notes || []))
-          .catch(() => {});
-      });
-  }, [id, token]);
+  const handleDeleteNote = async (noteId) => {
+    try {
+      await deleteNote(token, noteId);
+      setNotes(prev => prev.filter(note => note.id !== noteId));
+    } catch (err) {
+      console.error('Error al eliminar nota:', err);
+      alert('Error al eliminar nota: ' + err.message);
+    }
+  };
 
-  // ============================================
-  // ELIMINAR NOTA - OPTIMISTA
-  // ============================================
-  const handleDeleteNote = useCallback((noteId) => {
-    const deletedNote = notes.find(n => n.id === noteId);
-    
-    // Eliminar inmediatamente
-    setNotes(prev => prev.filter(note => note.id !== noteId));
-    
-    // Persistir en background
-    deleteNote(token, noteId)
-      .catch(err => {
-        console.error('Error al eliminar nota:', err);
-        if (deletedNote) {
-          setNotes(prev => [...prev, deletedNote]);
-        }
-        alert('Error al eliminar nota');
-      });
-  }, [notes, token]);
-
-  // ============================================
-  // TRAER AL FRENTE - OPTIMISTA
-  // ============================================
-  const handleBringToFront = useCallback((noteId) => {
+  const handleBringToFront = async (noteId) => {
     const maxZ = notes.reduce((max, note) => Math.max(max, note.z_index || 1), 0);
     const newZ = maxZ + 1;
     
-    const currentNote = notes.find(n => n.id === noteId);
-    if (currentNote && currentNote.z_index >= maxZ) {
-      return;
-    }
-    
+    // Actualizar localmente primero para UI responsiva
     setNotes(prev =>
       prev.map(note => 
         note.id === noteId ? { ...note, z_index: newZ } : note
       )
     );
     
-    updateNote(token, noteId, { z_index: newZ })
-      .catch(err => {
-        console.error('Error al actualizar z_index:', err);
-      });
-  }, [notes, token]);
+    // Luego persistir
+    try {
+      await updateNote(token, noteId, { z_index: newZ });
+    } catch (err) {
+      console.error('Error al actualizar z_index:', err);
+    }
+  };
 
-  // ============================================
-  // RENDER
-  // ============================================
+  // === Render ===
 
   if (loading) {
     return (
@@ -170,6 +140,7 @@ export default function Board() {
 
   return (
     <div className="board-page">
+      {/* Header simple */}
       <header style={{
         position: 'fixed',
         top: 0,
@@ -199,6 +170,7 @@ export default function Board() {
         </span>
       </header>
 
+      {/* Canvas con padding para header */}
       <main style={{ paddingTop: '48px' }}>
         <Canvas
           notes={notes}
