@@ -8,7 +8,7 @@ import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
  * 
  * URL: /board/:id?token=xxx
  * 
- * IMPORTANTE: Usa actualizaciones optimistas para UI suave
+ * Usa actualizaciones optimistas para UI instantánea
  */
 export default function Board() {
   const { id } = useParams();
@@ -63,14 +63,9 @@ export default function Board() {
 
   // ============================================
   // ACTUALIZAR NOTA - OPTIMISTA
-  // 
-  // La clave del movimiento suave:
-  // 1. Actualizamos el estado local INMEDIATAMENTE
-  // 2. Enviamos al servidor en background (sin bloquear)
-  // 3. Solo revertimos si hay error
   // ============================================
   const handleUpdateNote = useCallback((noteId, updates) => {
-    // 1. ACTUALIZACIÓN OPTIMISTA - inmediata, sin await
+    // 1. Actualizar estado local INMEDIATAMENTE
     setNotes(prev => 
       prev.map(note => 
         note.id === noteId 
@@ -79,32 +74,30 @@ export default function Board() {
       )
     );
 
-    // 2. PERSISTIR EN BACKGROUND - no bloqueamos la UI
+    // 2. Persistir en background (no bloqueamos UI)
     updateNote(token, noteId, updates)
       .catch(err => {
         console.error('Error al persistir nota:', err);
-        // En caso de error, recargar estado real del servidor
+        // Recargar estado real si hay error
         getBoard(id, token)
           .then(data => setNotes(data.notes || []))
-          .catch(() => {}); // ignorar error de recarga
+          .catch(() => {});
       });
   }, [id, token]);
 
   // ============================================
-  // ELIMINAR NOTA - También optimista
+  // ELIMINAR NOTA - OPTIMISTA
   // ============================================
   const handleDeleteNote = useCallback((noteId) => {
-    // Guardar nota por si hay que revertir
     const deletedNote = notes.find(n => n.id === noteId);
     
-    // Eliminar optimistamente
+    // Eliminar inmediatamente
     setNotes(prev => prev.filter(note => note.id !== noteId));
     
     // Persistir en background
     deleteNote(token, noteId)
       .catch(err => {
         console.error('Error al eliminar nota:', err);
-        // Revertir si falló
         if (deletedNote) {
           setNotes(prev => [...prev, deletedNote]);
         }
@@ -113,26 +106,23 @@ export default function Board() {
   }, [notes, token]);
 
   // ============================================
-  // TRAER AL FRENTE - Optimista
+  // TRAER AL FRENTE - OPTIMISTA
   // ============================================
   const handleBringToFront = useCallback((noteId) => {
     const maxZ = notes.reduce((max, note) => Math.max(max, note.z_index || 1), 0);
     const newZ = maxZ + 1;
     
-    // Solo actualizar si es necesario
     const currentNote = notes.find(n => n.id === noteId);
     if (currentNote && currentNote.z_index >= maxZ) {
-      return; // Ya está al frente
+      return;
     }
     
-    // Actualización optimista
     setNotes(prev =>
       prev.map(note => 
         note.id === noteId ? { ...note, z_index: newZ } : note
       )
     );
     
-    // Persistir en background
     updateNote(token, noteId, { z_index: newZ })
       .catch(err => {
         console.error('Error al actualizar z_index:', err);
@@ -180,7 +170,6 @@ export default function Board() {
 
   return (
     <div className="board-page">
-      {/* Header simple */}
       <header style={{
         position: 'fixed',
         top: 0,
@@ -210,7 +199,6 @@ export default function Board() {
         </span>
       </header>
 
-      {/* Canvas con padding para header */}
       <main style={{ paddingTop: '48px' }}>
         <Canvas
           notes={notes}

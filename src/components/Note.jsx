@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Paleta de colores para notas
@@ -15,57 +15,53 @@ const COLOR_PALETTE = [
 /**
  * Componente Note - Nota individual con drag, resize y edición
  * 
- * Props:
- * - note: { id, x, y, w, h, content, color, z_index }
- * - onUpdate: (noteId, updates) => void - Actualización OPTIMISTA
- * - onDelete: (noteId) => void
- * - onBringToFront: (noteId) => void
+ * CLAVE: Usamos refs + manipulación DOM directa durante drag/resize
+ * para evitar re-renders en cada frame del mouse.
  */
 export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
   const noteRef = useRef(null);
   
-  // Estado local para movimiento suave (sin lag)
+  // Estado para renderizado (solo se actualiza al inicio y al soltar)
   const [position, setPosition] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ w: note.w, h: note.h });
   const [content, setContent] = useState(note.content || '');
   
-  // Estados de interacción
+  // Estados de interacción (para estilos visuales)
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
   
-  // Offset para drag preciso
+  // === REFS para tracking sin re-renders ===
   const dragOffset = useRef({ x: 0, y: 0 });
+  const currentPos = useRef({ x: note.x, y: note.y });
+  const currentSize = useRef({ w: note.w, h: note.h });
 
   // ============================================
-  // SINCRONIZAR PROPS → ESTADO LOCAL
-  // (cuando el padre actualiza, sincronizamos)
+  // SINCRONIZAR PROPS → ESTADO/REFS
   // ============================================
   useEffect(() => {
-    // Solo sincronizar si NO estamos arrastrando/redimensionando
     if (!isDragging) {
       setPosition({ x: note.x, y: note.y });
+      currentPos.current = { x: note.x, y: note.y };
     }
   }, [note.x, note.y, isDragging]);
 
   useEffect(() => {
     if (!isResizing) {
       setSize({ w: note.w, h: note.h });
+      currentSize.current = { w: note.w, h: note.h };
     }
   }, [note.w, note.h, isResizing]);
 
   useEffect(() => {
-    // Solo sincronizar content si no tiene el foco
     if (document.activeElement !== noteRef.current?.querySelector('textarea')) {
       setContent(note.content || '');
     }
   }, [note.content]);
 
   // ============================================
-  // DRAG - Movimiento suave 100% local
+  // DRAG - Movimiento via DOM directo (sin re-renders)
   // ============================================
   const handleDragStart = (e) => {
-    // Ignorar si viene del textarea, resize handle, o botones
     if (
       e.target.tagName === 'TEXTAREA' || 
       e.target.classList.contains('resize-handle') ||
@@ -83,6 +79,8 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
       y: e.clientY - rect.top,
     };
     
+    currentPos.current = { x: position.x, y: position.y };
+    
     setIsDragging(true);
     onBringToFront(note.id);
   };
@@ -91,30 +89,31 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
     if (!isDragging) return;
 
     const handleMouseMove = (e) => {
-      // Calcular posición relativa al canvas (padre)
       const canvas = noteRef.current.parentElement;
       const canvasRect = canvas.getBoundingClientRect();
       
-      const newX = e.clientX - canvasRect.left - dragOffset.current.x;
-      const newY = e.clientY - canvasRect.top - dragOffset.current.y;
+      const newX = Math.max(0, e.clientX - canvasRect.left - dragOffset.current.x);
+      const newY = Math.max(0, e.clientY - canvasRect.top - dragOffset.current.y);
       
-      // Limitar a valores positivos
-      setPosition({
-        x: Math.max(0, newX),
-        y: Math.max(0, newY),
-      });
+      // Guardar en ref (sin re-render)
+      currentPos.current = { x: newX, y: newY };
+      
+      // Mover elemento via DOM directo (máxima performance)
+      noteRef.current.style.left = `${newX}px`;
+      noteRef.current.style.top = `${newY}px`;
     };
 
     const handleMouseUp = () => {
+      const finalX = Math.round(currentPos.current.x);
+      const finalY = Math.round(currentPos.current.y);
+      
+      // Sincronizar estado React con posición final
+      setPosition({ x: finalX, y: finalY });
       setIsDragging(false);
       
-      // Solo notificar al padre si la posición cambió
-      const newX = Math.round(position.x);
-      const newY = Math.round(position.y);
-      
-      if (newX !== note.x || newY !== note.y) {
-        // Actualización optimista - el padre actualiza inmediatamente
-        onUpdate(note.id, { x: newX, y: newY });
+      // Persistir si cambió
+      if (finalX !== note.x || finalY !== note.y) {
+        onUpdate(note.id, { x: finalX, y: finalY });
       }
     };
 
@@ -125,14 +124,15 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, position.x, position.y, note.x, note.y, note.id, onUpdate]);
+  }, [isDragging, note.id, note.x, note.y, onUpdate]);
 
   // ============================================
-  // RESIZE - Redimensionado suave
+  // RESIZE - También via DOM directo
   // ============================================
   const handleResizeStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    currentSize.current = { w: size.w, h: size.h };
     setIsResizing(true);
   };
 
@@ -144,17 +144,21 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
       const newW = Math.max(150, e.clientX - rect.left);
       const newH = Math.max(100, e.clientY - rect.top);
       
-      setSize({ w: newW, h: newH });
+      currentSize.current = { w: newW, h: newH };
+      
+      noteRef.current.style.width = `${newW}px`;
+      noteRef.current.style.height = `${newH}px`;
     };
 
     const handleMouseUp = () => {
+      const finalW = Math.round(currentSize.current.w);
+      const finalH = Math.round(currentSize.current.h);
+      
+      setSize({ w: finalW, h: finalH });
       setIsResizing(false);
       
-      const newW = Math.round(size.w);
-      const newH = Math.round(size.h);
-      
-      if (newW !== note.w || newH !== note.h) {
-        onUpdate(note.id, { w: newW, h: newH });
+      if (finalW !== note.w || finalH !== note.h) {
+        onUpdate(note.id, { w: finalW, h: finalH });
       }
     };
 
@@ -165,7 +169,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, size.w, size.h, note.w, note.h, note.id, onUpdate]);
+  }, [isResizing, note.id, note.w, note.h, onUpdate]);
 
   // ============================================
   // EDICIÓN DE CONTENIDO
@@ -185,7 +189,6 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
   // ============================================
   const handleColorChange = (color) => {
     onUpdate(note.id, { color });
-    setShowColorPicker(false);
   };
 
   // ============================================
@@ -222,7 +225,6 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
         display: 'flex',
         flexDirection: 'column',
         userSelect: isDragging || isResizing ? 'none' : 'auto',
-        transition: isDragging || isResizing ? 'none' : 'box-shadow 0.2s',
         transform: isDragging ? 'scale(1.02)' : 'scale(1)',
       }}
     >
@@ -238,7 +240,6 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
           cursor: 'grab',
         }}
       >
-        {/* Selector de color */}
         <div style={{ display: 'flex', gap: '3px' }}>
           {COLOR_PALETTE.map((color) => (
             <button
@@ -260,10 +261,8 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
           ))}
         </div>
         
-        {/* Espaciador */}
         <div style={{ flex: 1 }} />
         
-        {/* Botón eliminar */}
         <button
           onClick={handleDelete}
           style={{
