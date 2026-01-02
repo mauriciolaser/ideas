@@ -1,0 +1,4 @@
+# Denegar acceso directo a los archivos de acciones
+# Solo deben ser accedidos via /api/index.php
+
+Deny from all
