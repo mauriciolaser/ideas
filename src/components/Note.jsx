@@ -1,5 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 
+// Color default para sticky notes (amarillo clásico)
+const DEFAULT_COLOR = '#FFFFA5';
+
+// Valida que sea un color hex válido
+function isValidHexColor(color) {
+  return color && /^#[0-9A-Fa-f]{6}$/.test(color);
+}
+
 /**
  * Componente Note - Nota individual tipo sticky note
  * 
@@ -11,6 +19,9 @@ import { useState, useRef, useEffect } from 'react';
  * - maxZIndex: z_index máximo actual del canvas
  */
 export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZIndex }) {
+  // Color validado con fallback a amarillo
+  const noteColor = isValidHexColor(note.color) ? note.color : DEFAULT_COLOR;
+  
   // Estado local para posición/tamaño durante drag/resize
   const [position, setPosition] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ w: note.w, h: note.h });
@@ -157,7 +168,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
         top: position.y,
         width: size.w,
         height: size.h,
-        backgroundColor: note.color || '#FFFFA5',
+        backgroundColor: noteColor,
         zIndex: note.z_index,
         cursor: isDragging ? 'grabbing' : 'grab',
         boxShadow: '2px 2px 8px rgba(0,0,0,0.15)',

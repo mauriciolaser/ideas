@@ -1,0 +1,69 @@
+# .github/workflows/deploy.yml
+# ------------------------------------------------------------
+# ► Despliegue manual (workflow_dispatch) vía FTP
+# ► Stack: React + Vite  •  Node LTS 22.16.0
+# ------------------------------------------------------------
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 0) Inicio del workflow
+      - name: ⏩ Inicio del workflow
+        run: echo "🚀 Comenzando despliegue de perulainen.com por FTP…"
+
+
+
+      # 1) Checkout del código
+      - name: ⤵️  Checkout código
+        uses: actions/checkout@v4
+
+      # 2) Setup de Node.js LTS
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          cache: npm
+
+      # 3) Instalar dependencias
+      - name: 📦 Instalar dependencias
+        run: npm ci
+
+      # 3.b) Instalar yargs para el script CLI (si lo usas)
+      - name: 📦 Instalar yargs
+        run: npm install yargs
+
+      # 4) Compilar proyecto con Vite
+      - name: 🏗️  Compilar proyecto
+        run: |
+          echo "🔨 Construyendo con Vite..."
+          npm run build
+          echo "✔️  Build completado en dist/"
+
+      # 5) Mensaje antes de deploy
+      - name: 📤 Preparando subida FTP
+        run: echo "🔄 Cargando carpeta dist/ a tu hosting…"
+
+      # 6) Despliegue vía FTP
+      - name: 🚚 Upload via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:               ${{ secrets.FTP_HOST }}
+          username:             ${{ secrets.FTP_USERNAME }}
+          password:             ${{ secrets.FTP_PASSWORD }}
+          protocol:             ftp
+          port:                 21
+          local-dir:            dist/
+          server-dir:           ${{ secrets.FTP_REMOTE_ROOT }}
+          security:             loose
+          dangerous-clean-slate: false
+
+      # 7) Fin del workflow
+      - name: ✅ Fin del workflow
+        run: echo "🎉 Deploy completado con éxito."
