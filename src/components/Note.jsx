@@ -1,50 +1,48 @@
-import { useState, useRef, useEffect } from 'react';
-
-// Color default para sticky notes (amarillo clásico)
-const DEFAULT_COLOR = '#FFFFA5';
-
-// Paleta de colores disponibles
-const COLOR_PALETTE = [
-  '#FFFFA5', // Amarillo
-  '#FFB3BA', // Rosa
-  '#BAFFC9', // Verde
-  '#BAE1FF', // Azul
-  '#FFDFBA', // Naranja
-  '#E2B6FF', // Morado
-];
-
-// Valida que sea un color hex válido
-function isValidHexColor(color) {
-  return color && /^#[0-9A-Fa-f]{6}$/.test(color);
-}
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
- * Componente Note - Nota individual tipo sticky note
+ * Paleta de colores para notas
+ */
+const COLOR_PALETTE = [
+  '#FFFFA5', // Amarillo (default)
+  '#A5D6FF', // Azul
+  '#B8F5B8', // Verde
+  '#FFB8D4', // Rosa
+  '#E5B8FF', // Morado
+  '#FFD4A5', // Naranja
+];
+
+/**
+ * Componente Note - Nota individual con drag, resize y edición
  * 
  * Props:
- * - note: objeto con {id, x, y, w, h, content, color, z_index}
- * - onUpdate: función para actualizar nota (noteId, updates)
- * - onDelete: función para eliminar nota (noteId)
- * - onBringToFront: función para traer al frente (noteId)
- * - maxZIndex: z_index máximo actual del canvas
+ * - note: { id, x, y, w, h, content, color, z_index }
+ * - onUpdate: (noteId, updates) => void - Actualización OPTIMISTA
+ * - onDelete: (noteId) => void
+ * - onBringToFront: (noteId) => void
  */
-export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZIndex }) {
-  // Color validado con fallback a amarillo
-  const noteColor = isValidHexColor(note.color) ? note.color : DEFAULT_COLOR;
+export default function Note({ note, onUpdate, onDelete, onBringToFront }) {
+  const noteRef = useRef(null);
   
-  // Estado local para posición/tamaño durante drag/resize
+  // Estado local para movimiento suave (sin lag)
   const [position, setPosition] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ w: note.w, h: note.h });
   const [content, setContent] = useState(note.content || '');
+  
+  // Estados de interacción
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   
-  const noteRef = useRef(null);
+  // Offset para drag preciso
   const dragOffset = useRef({ x: 0, y: 0 });
-  const textareaRef = useRef(null);
 
-  // Sincronizar con props cuando cambian externamente
+  // ============================================
+  // SINCRONIZAR PROPS → ESTADO LOCAL
+  // (cuando el padre actualiza, sincronizamos)
+  // ============================================
   useEffect(() => {
+    // Solo sincronizar si NO estamos arrastrando/redimensionando
     if (!isDragging) {
       setPosition({ x: note.x, y: note.y });
     }
@@ -57,50 +55,66 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
   }, [note.w, note.h, isResizing]);
 
   useEffect(() => {
-    setContent(note.content || '');
+    // Solo sincronizar content si no tiene el foco
+    if (document.activeElement !== noteRef.current?.querySelector('textarea')) {
+      setContent(note.content || '');
+    }
   }, [note.content]);
 
-  // === DRAG ===
-  const handleMouseDown = (e) => {
-    // Ignorar si es el resize handle o el textarea
-    if (e.target.classList.contains('resize-handle') || 
-        e.target.tagName === 'TEXTAREA') {
+  // ============================================
+  // DRAG - Movimiento suave 100% local
+  // ============================================
+  const handleDragStart = (e) => {
+    // Ignorar si viene del textarea, resize handle, o botones
+    if (
+      e.target.tagName === 'TEXTAREA' || 
+      e.target.classList.contains('resize-handle') ||
+      e.target.tagName === 'BUTTON' ||
+      e.target.closest('.note-header')
+    ) {
       return;
     }
     
     e.preventDefault();
-    setIsDragging(true);
     
     const rect = noteRef.current.getBoundingClientRect();
     dragOffset.current = {
       x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      y: e.clientY - rect.top,
     };
-
-    // Traer al frente al hacer click
-    if (note.z_index < maxZIndex) {
-      onBringToFront(note.id);
-    }
+    
+    setIsDragging(true);
+    onBringToFront(note.id);
   };
 
   useEffect(() => {
     if (!isDragging) return;
 
     const handleMouseMove = (e) => {
+      // Calcular posición relativa al canvas (padre)
       const canvas = noteRef.current.parentElement;
       const canvasRect = canvas.getBoundingClientRect();
       
-      const newX = Math.max(0, e.clientX - canvasRect.left - dragOffset.current.x);
-      const newY = Math.max(0, e.clientY - canvasRect.top - dragOffset.current.y);
+      const newX = e.clientX - canvasRect.left - dragOffset.current.x;
+      const newY = e.clientY - canvasRect.top - dragOffset.current.y;
       
-      setPosition({ x: newX, y: newY });
+      // Limitar a valores positivos
+      setPosition({
+        x: Math.max(0, newX),
+        y: Math.max(0, newY),
+      });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      // PATCH solo al soltar
-      if (position.x !== note.x || position.y !== note.y) {
-        onUpdate(note.id, { x: Math.round(position.x), y: Math.round(position.y) });
+      
+      // Solo notificar al padre si la posición cambió
+      const newX = Math.round(position.x);
+      const newY = Math.round(position.y);
+      
+      if (newX !== note.x || newY !== note.y) {
+        // Actualización optimista - el padre actualiza inmediatamente
+        onUpdate(note.id, { x: newX, y: newY });
       }
     };
 
@@ -111,9 +125,11 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, position, note.x, note.y, note.id, onUpdate]);
+  }, [isDragging, position.x, position.y, note.x, note.y, note.id, onUpdate]);
 
-  // === RESIZE ===
+  // ============================================
+  // RESIZE - Redimensionado suave
+  // ============================================
   const handleResizeStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -133,9 +149,12 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
 
     const handleMouseUp = () => {
       setIsResizing(false);
-      // PATCH solo al soltar
-      if (size.w !== note.w || size.h !== note.h) {
-        onUpdate(note.id, { w: Math.round(size.w), h: Math.round(size.h) });
+      
+      const newW = Math.round(size.w);
+      const newH = Math.round(size.h);
+      
+      if (newW !== note.w || newH !== note.h) {
+        onUpdate(note.id, { w: newW, h: newH });
       }
     };
 
@@ -146,21 +165,32 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, size, note.w, note.h, note.id, onUpdate]);
+  }, [isResizing, size.w, size.h, note.w, note.h, note.id, onUpdate]);
 
-  // === EDICIÓN ===
+  // ============================================
+  // EDICIÓN DE CONTENIDO
+  // ============================================
   const handleContentChange = (e) => {
     setContent(e.target.value);
   };
 
   const handleContentBlur = () => {
-    // PATCH solo si cambió
     if (content !== (note.content || '')) {
       onUpdate(note.id, { content });
     }
   };
 
-  // === DELETE ===
+  // ============================================
+  // COLOR
+  // ============================================
+  const handleColorChange = (color) => {
+    onUpdate(note.id, { color });
+    setShowColorPicker(false);
+  };
+
+  // ============================================
+  // DELETE
+  // ============================================
   const handleDelete = (e) => {
     e.stopPropagation();
     if (confirm('¿Eliminar esta nota?')) {
@@ -168,63 +198,72 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
     }
   };
 
-  // === COLOR ===
-  const handleColorChange = (e, newColor) => {
-    e.stopPropagation();
-    if (newColor !== noteColor) {
-      onUpdate(note.id, { color: newColor });
-    }
-  };
-
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <div
       ref={noteRef}
       className="note"
+      onMouseDown={handleDragStart}
       style={{
         position: 'absolute',
         left: position.x,
         top: position.y,
         width: size.w,
         height: size.h,
-        backgroundColor: noteColor,
+        backgroundColor: note.color || '#FFFFA5',
         zIndex: note.z_index,
         cursor: isDragging ? 'grabbing' : 'grab',
-        boxShadow: '2px 2px 8px rgba(0,0,0,0.15)',
+        boxShadow: isDragging 
+          ? '4px 6px 16px rgba(0,0,0,0.25)' 
+          : '2px 2px 8px rgba(0,0,0,0.15)',
         borderRadius: '4px',
         display: 'flex',
         flexDirection: 'column',
         userSelect: isDragging || isResizing ? 'none' : 'auto',
+        transition: isDragging || isResizing ? 'none' : 'box-shadow 0.2s',
+        transform: isDragging ? 'scale(1.02)' : 'scale(1)',
       }}
-      onMouseDown={handleMouseDown}
     >
-      {/* Header con selector de color y botón eliminar */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '4px 8px',
-        borderBottom: '1px solid rgba(0,0,0,0.1)',
-      }}>
-        {/* Paleta de colores */}
-        <div style={{ display: 'flex', gap: '4px' }}>
+      {/* Header con colores y botón eliminar */}
+      <div 
+        className="note-header"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '6px 8px',
+          gap: '4px',
+          borderBottom: '1px solid rgba(0,0,0,0.08)',
+          cursor: 'grab',
+        }}
+      >
+        {/* Selector de color */}
+        <div style={{ display: 'flex', gap: '3px' }}>
           {COLOR_PALETTE.map((color) => (
             <button
               key={color}
-              onClick={(e) => handleColorChange(e, color)}
+              onClick={() => handleColorChange(color)}
               style={{
                 width: '16px',
                 height: '16px',
                 borderRadius: '50%',
                 backgroundColor: color,
-                border: color === noteColor ? '2px solid #333' : '1px solid rgba(0,0,0,0.2)',
+                border: note.color === color 
+                  ? '2px solid rgba(0,0,0,0.5)' 
+                  : '1px solid rgba(0,0,0,0.2)',
                 cursor: 'pointer',
                 padding: 0,
               }}
-              title="Cambiar color"
+              title={`Color: ${color}`}
             />
           ))}
         </div>
         
+        {/* Espaciador */}
+        <div style={{ flex: 1 }} />
+        
+        {/* Botón eliminar */}
         <button
           onClick={handleDelete}
           style={{
@@ -232,21 +271,22 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
             border: 'none',
             cursor: 'pointer',
             fontSize: '14px',
-            color: '#666',
             padding: '2px 6px',
+            borderRadius: '4px',
+            color: '#888',
           }}
           title="Eliminar nota"
         >
-          ✕
+          ×
         </button>
       </div>
 
-      {/* Área de texto */}
+      {/* Contenido editable */}
       <textarea
-        ref={textareaRef}
         value={content}
         onChange={handleContentChange}
         onBlur={handleContentBlur}
+        onMouseDown={(e) => e.stopPropagation()}
         placeholder="Escribe aquí..."
         style={{
           flex: 1,
@@ -254,8 +294,9 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
           background: 'transparent',
           resize: 'none',
           padding: '8px',
-          fontFamily: 'inherit',
           fontSize: '14px',
+          lineHeight: '1.4',
+          fontFamily: 'inherit',
           outline: 'none',
           cursor: 'text',
         }}
@@ -272,7 +313,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
           width: '16px',
           height: '16px',
           cursor: 'se-resize',
-          background: 'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.2) 50%)',
+          background: 'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.1) 50%)',
           borderRadius: '0 0 4px 0',
         }}
       />

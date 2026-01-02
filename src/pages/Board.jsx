@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Canvas from '../components/Canvas';
 import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
@@ -7,6 +7,8 @@ import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
  * Página Board - Maneja el estado del tablero
  * 
  * URL: /board/:id?token=xxx
+ * 
+ * IMPORTANTE: Usa actualizaciones optimistas para UI suave
  */
 export default function Board() {
   const { id } = useParams();
@@ -42,9 +44,10 @@ export default function Board() {
     loadBoard();
   }, [id, token]);
 
-  // === Handlers ===
-
-  const handleCreateNote = async (x, y) => {
+  // ============================================
+  // CREAR NOTA
+  // ============================================
+  const handleCreateNote = useCallback(async (x, y) => {
     try {
       const newNote = await createNote(token, {
         board_id: parseInt(id),
@@ -56,52 +59,89 @@ export default function Board() {
       console.error('Error al crear nota:', err);
       alert('Error al crear nota: ' + err.message);
     }
-  };
+  }, [id, token]);
 
-  const handleUpdateNote = async (noteId, updates) => {
-    try {
-      const updatedNote = await updateNote(token, noteId, updates);
-      setNotes(prev => 
-        prev.map(note => note.id === noteId ? updatedNote : note)
-      );
-    } catch (err) {
-      console.error('Error al actualizar nota:', err);
-      // Revertir cambios locales recargando el tablero
-      const data = await getBoard(id, token);
-      setNotes(data.notes || []);
-    }
-  };
+  // ============================================
+  // ACTUALIZAR NOTA - OPTIMISTA
+  // 
+  // La clave del movimiento suave:
+  // 1. Actualizamos el estado local INMEDIATAMENTE
+  // 2. Enviamos al servidor en background (sin bloquear)
+  // 3. Solo revertimos si hay error
+  // ============================================
+  const handleUpdateNote = useCallback((noteId, updates) => {
+    // 1. ACTUALIZACIÓN OPTIMISTA - inmediata, sin await
+    setNotes(prev => 
+      prev.map(note => 
+        note.id === noteId 
+          ? { ...note, ...updates }
+          : note
+      )
+    );
 
-  const handleDeleteNote = async (noteId) => {
-    try {
-      await deleteNote(token, noteId);
-      setNotes(prev => prev.filter(note => note.id !== noteId));
-    } catch (err) {
-      console.error('Error al eliminar nota:', err);
-      alert('Error al eliminar nota: ' + err.message);
-    }
-  };
+    // 2. PERSISTIR EN BACKGROUND - no bloqueamos la UI
+    updateNote(token, noteId, updates)
+      .catch(err => {
+        console.error('Error al persistir nota:', err);
+        // En caso de error, recargar estado real del servidor
+        getBoard(id, token)
+          .then(data => setNotes(data.notes || []))
+          .catch(() => {}); // ignorar error de recarga
+      });
+  }, [id, token]);
 
-  const handleBringToFront = async (noteId) => {
+  // ============================================
+  // ELIMINAR NOTA - También optimista
+  // ============================================
+  const handleDeleteNote = useCallback((noteId) => {
+    // Guardar nota por si hay que revertir
+    const deletedNote = notes.find(n => n.id === noteId);
+    
+    // Eliminar optimistamente
+    setNotes(prev => prev.filter(note => note.id !== noteId));
+    
+    // Persistir en background
+    deleteNote(token, noteId)
+      .catch(err => {
+        console.error('Error al eliminar nota:', err);
+        // Revertir si falló
+        if (deletedNote) {
+          setNotes(prev => [...prev, deletedNote]);
+        }
+        alert('Error al eliminar nota');
+      });
+  }, [notes, token]);
+
+  // ============================================
+  // TRAER AL FRENTE - Optimista
+  // ============================================
+  const handleBringToFront = useCallback((noteId) => {
     const maxZ = notes.reduce((max, note) => Math.max(max, note.z_index || 1), 0);
     const newZ = maxZ + 1;
     
-    // Actualizar localmente primero para UI responsiva
+    // Solo actualizar si es necesario
+    const currentNote = notes.find(n => n.id === noteId);
+    if (currentNote && currentNote.z_index >= maxZ) {
+      return; // Ya está al frente
+    }
+    
+    // Actualización optimista
     setNotes(prev =>
       prev.map(note => 
         note.id === noteId ? { ...note, z_index: newZ } : note
       )
     );
     
-    // Luego persistir
-    try {
-      await updateNote(token, noteId, { z_index: newZ });
-    } catch (err) {
-      console.error('Error al actualizar z_index:', err);
-    }
-  };
+    // Persistir en background
+    updateNote(token, noteId, { z_index: newZ })
+      .catch(err => {
+        console.error('Error al actualizar z_index:', err);
+      });
+  }, [notes, token]);
 
-  // === Render ===
+  // ============================================
+  // RENDER
+  // ============================================
 
   if (loading) {
     return (

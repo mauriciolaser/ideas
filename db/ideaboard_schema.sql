@@ -1,0 +1,36 @@
+-- Usar la base de datos
+USE vallhzty_board;
+
+-- Tabla: boards
+CREATE TABLE IF NOT EXISTS boards (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    title VARCHAR(255) NOT NULL DEFAULT 'Untitled',
+    token VARCHAR(64) NOT NULL,
+    archived_at DATETIME NULL DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY idx_token (token),
+    KEY idx_archived (archived_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla: notes
+CREATE TABLE IF NOT EXISTS notes (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    board_id INT UNSIGNED NOT NULL,
+    content TEXT,
+    x INT NOT NULL DEFAULT 100,
+    y INT NOT NULL DEFAULT 100,
+    w INT NOT NULL DEFAULT 200,
+    h INT NOT NULL DEFAULT 150,
+    color VARCHAR(20) NOT NULL DEFAULT '#FFFFA5',
+    z_index INT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_board_id (board_id),
+    CONSTRAINT fk_notes_board FOREIGN KEY (board_id) 
+        REFERENCES boards (id) 
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
