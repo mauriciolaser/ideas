@@ -3,6 +3,16 @@ import { useState, useRef, useEffect } from 'react';
 // Color default para sticky notes (amarillo clásico)
 const DEFAULT_COLOR = '#FFFFA5';
 
+// Paleta de colores disponibles
+const COLOR_PALETTE = [
+  '#FFFFA5', // Amarillo
+  '#FFB3BA', // Rosa
+  '#BAFFC9', // Verde
+  '#BAE1FF', // Azul
+  '#FFDFBA', // Naranja
+  '#E2B6FF', // Morado
+];
+
 // Valida que sea un color hex válido
 function isValidHexColor(color) {
   return color && /^#[0-9A-Fa-f]{6}$/.test(color);
@@ -158,6 +168,14 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
     }
   };
 
+  // === COLOR ===
+  const handleColorChange = (e, newColor) => {
+    e.stopPropagation();
+    if (newColor !== noteColor) {
+      onUpdate(note.id, { color: newColor });
+    }
+  };
+
   return (
     <div
       ref={noteRef}
@@ -179,13 +197,34 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       }}
       onMouseDown={handleMouseDown}
     >
-      {/* Header con botón de eliminar */}
+      {/* Header con selector de color y botón eliminar */}
       <div style={{
         display: 'flex',
-        justifyContent: 'flex-end',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         padding: '4px 8px',
         borderBottom: '1px solid rgba(0,0,0,0.1)',
       }}>
+        {/* Paleta de colores */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {COLOR_PALETTE.map((color) => (
+            <button
+              key={color}
+              onClick={(e) => handleColorChange(e, color)}
+              style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                backgroundColor: color,
+                border: color === noteColor ? '2px solid #333' : '1px solid rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+              title="Cambiar color"
+            />
+          ))}
+        </div>
+        
         <button
           onClick={handleDelete}
           style={{
