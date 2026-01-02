@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createBoard, listBoards } from '../api/boardApi';
+import { createBoard, listBoards, archiveBoard } from '../api/boardApi';
 
 /**
  * Página Home - Crear nuevo tablero o acceder a uno existente
@@ -12,15 +12,17 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [boards, setBoards] = useState([]);
   const [loadingBoards, setLoadingBoards] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
 
-  // Cargar tableros al montar
+  // Cargar tableros al montar y cuando cambia el filtro
   useEffect(() => {
     loadBoards();
-  }, []);
+  }, [showArchived]);
 
   const loadBoards = async () => {
+    setLoadingBoards(true);
     try {
-      const data = await listBoards();
+      const data = await listBoards(showArchived ? '1' : '0');
       setBoards(data.boards || []);
     } catch (err) {
       console.error('Error cargando tableros:', err);
@@ -37,7 +39,6 @@ export default function Home() {
 
     try {
       const board = await createBoard(title || 'Untitled');
-      // Redirigir al tablero con el token
       navigate(`/board/${board.id}?token=${board.token}`);
     } catch (err) {
       setError(err.message || 'Error al crear tablero');
@@ -48,6 +49,24 @@ export default function Home() {
   // Navegar a un tablero
   const goToBoard = (board) => {
     navigate(`/board/${board.id}?token=${board.token}`);
+  };
+
+  // Archivar/Desarchivar tablero
+  const handleArchive = async (e, board, archive) => {
+    e.stopPropagation(); // Evitar navegación al tablero
+    
+    const action = archive ? 'archivar' : 'desarchivar';
+    if (!confirm(`¿${archive ? 'Archivar' : 'Desarchivar'} "${board.title}"?`)) {
+      return;
+    }
+
+    try {
+      await archiveBoard(board.token, board.id, archive);
+      // Recargar lista
+      loadBoards();
+    } catch (err) {
+      alert(`Error al ${action}: ${err.message}`);
+    }
   };
 
   // Formatear fecha
@@ -140,14 +159,64 @@ export default function Home() {
 
         {/* Lista de tableros */}
         <div>
-          <h2 style={{ 
-            fontSize: '18px', 
-            color: '#555', 
+          {/* Header con filtro */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             marginBottom: '16px',
-            fontWeight: '600',
           }}>
-            Tableros existentes
-          </h2>
+            <h2 style={{ 
+              fontSize: '18px', 
+              color: '#555', 
+              fontWeight: '600',
+              margin: 0,
+            }}>
+              {showArchived ? 'Tableros archivados' : 'Tableros activos'}
+            </h2>
+
+            {/* Filtro tabs */}
+            <div style={{
+              display: 'flex',
+              gap: '4px',
+              backgroundColor: '#e0e0e0',
+              padding: '4px',
+              borderRadius: '8px',
+            }}>
+              <button
+                onClick={() => setShowArchived(false)}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: !showArchived ? 'white' : 'transparent',
+                  color: !showArchived ? '#333' : '#666',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Activos
+              </button>
+              <button
+                onClick={() => setShowArchived(true)}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: showArchived ? 'white' : 'transparent',
+                  color: showArchived ? '#333' : '#666',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Archivados
+              </button>
+            </div>
+          </div>
 
           {loadingBoards ? (
             <p style={{ color: '#888', textAlign: 'center', padding: '40px' }}>
@@ -161,7 +230,9 @@ export default function Home() {
               textAlign: 'center',
               color: '#888',
             }}>
-              No hay tableros creados aún. ¡Crea el primero!
+              {showArchived 
+                ? 'No hay tableros archivados.' 
+                : 'No hay tableros creados aún. ¡Crea el primero!'}
             </div>
           ) : (
             <div style={{
@@ -181,11 +252,12 @@ export default function Home() {
                     cursor: 'pointer',
                     transition: 'transform 0.15s, box-shadow 0.15s',
                     border: '2px solid transparent',
+                    position: 'relative',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
-                    e.currentTarget.style.borderColor = '#4CAF50';
+                    e.currentTarget.style.borderColor = showArchived ? '#888' : '#4CAF50';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
@@ -193,6 +265,42 @@ export default function Home() {
                     e.currentTarget.style.borderColor = 'transparent';
                   }}
                 >
+                  {/* Botón archivar/desarchivar */}
+                  <button
+                    onClick={(e) => handleArchive(e, board, !showArchived)}
+                    title={showArchived ? 'Desarchivar' : 'Archivar'}
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      width: '28px',
+                      height: '28px',
+                      padding: 0,
+                      backgroundColor: 'transparent',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      color: '#888',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = showArchived ? '#4CAF50' : '#ff9800';
+                      e.currentTarget.style.borderColor = showArchived ? '#4CAF50' : '#ff9800';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.borderColor = '#ddd';
+                      e.currentTarget.style.color = '#888';
+                    }}
+                  >
+                    {showArchived ? '↩' : '📦'}
+                  </button>
+
                   <h3 style={{
                     fontSize: '16px',
                     fontWeight: '600',
@@ -201,6 +309,7 @@ export default function Home() {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    paddingRight: '36px', // Espacio para el botón
                   }}>
                     {board.title}
                   </h3>
@@ -220,7 +329,7 @@ export default function Home() {
                       {board.note_count} {board.note_count === 1 ? 'nota' : 'notas'}
                     </span>
                     <span>
-                      {formatDate(board.updated_at)}
+                      {formatDate(showArchived ? board.archived_at : board.updated_at)}
                     </span>
                   </div>
                 </div>

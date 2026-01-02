@@ -30,11 +30,12 @@ async function handleResponse(response) {
 }
 
 /**
- * Listar todos los tableros
+ * Listar tableros
+ * @param {string} archived - '0' (activos, default), '1' (archivados), 'all' (todos)
  * @returns {Promise<{boards: array}>}
  */
-export async function listBoards() {
-  const response = await fetch(`${API_BASE}?action=listBoards`, {
+export async function listBoards(archived = '0') {
+  const response = await fetch(`${API_BASE}?action=listBoards&archived=${archived}`, {
     method: 'GET',
     headers: buildHeaders(),
   });
@@ -65,6 +66,22 @@ export async function getBoard(boardId, token) {
   const response = await fetch(`${API_BASE}?action=getBoard&id=${boardId}`, {
     method: 'GET',
     headers: buildHeaders(token),
+  });
+  return handleResponse(response);
+}
+
+/**
+ * Archivar o desarchivar un tablero
+ * @param {string} token - Token de acceso
+ * @param {number} boardId - ID del tablero
+ * @param {boolean} archived - true para archivar, false para desarchivar
+ * @returns {Promise<{id: number, archived_at: string|null}>}
+ */
+export async function archiveBoard(token, boardId, archived) {
+  const response = await fetch(`${API_BASE}?action=archiveBoard&id=${boardId}`, {
+    method: 'PATCH',
+    headers: buildHeaders(token),
+    body: JSON.stringify({ archived }),
   });
   return handleResponse(response);
 }
