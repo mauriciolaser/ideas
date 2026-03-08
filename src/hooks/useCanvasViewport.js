@@ -51,9 +51,9 @@ export function useCanvasViewport() {
     };
   }, [zoom, pan]);
 
-  // Pan con right-click + drag
+  // Pan con middle-click + drag
   const handlePanStart = useCallback((e) => {
-    if (e.button !== 2) return; // solo right-click
+    if (e.button !== 1) return; // solo middle-click
     e.preventDefault();
     setIsPanning(true);
     panStart.current = {
@@ -77,7 +77,7 @@ export function useCanvasViewport() {
     };
 
     const handleMouseUp = (e) => {
-      if (e.button === 2) {
+      if (e.button === 1) {
         setIsPanning(false);
       }
     };

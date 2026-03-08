@@ -20,27 +20,40 @@ function isValidHexColor(color) {
 
 /**
  * Componente Note - Nota individual tipo sticky note
- * 
+ *
  * Props:
  * - note: objeto con {id, x, y, w, h, content, color, z_index}
  * - onUpdate: función para actualizar nota (noteId, updates)
  * - onDelete: función para eliminar nota (noteId)
  * - onBringToFront: función para traer al frente (noteId)
  * - maxZIndex: z_index máximo actual del canvas
+ * - isSelected: si la nota está seleccionada
+ * - isMultiSelected: si hay múltiples notas seleccionadas y esta es una de ellas
+ * - groupDragOffset: {dx, dy} offset visual durante group drag (null si no aplica)
+ * - onGroupDragMove: callback(noteId, dx, dy) durante group drag
+ * - onGroupDragEnd: callback(noteId, dx, dy) al soltar group drag
+ * - onClearSelection: callback para limpiar selección
  */
-export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZIndex, zoom = 1 }) {
+export default function Note({
+  note, onUpdate, onDelete, onBringToFront, maxZIndex,
+  zoom = 1, viewportRef, screenToWorld,
+  isSelected = false, isMultiSelected = false,
+  groupDragOffset = null,
+  onGroupDragMove, onGroupDragEnd, onClearSelection
+}) {
   // Color validado con fallback a amarillo
   const noteColor = isValidHexColor(note.color) ? note.color : DEFAULT_COLOR;
-  
+
   // Estado local para posición/tamaño durante drag/resize
   const [position, setPosition] = useState({ x: note.x, y: note.y });
   const [size, setSize] = useState({ w: note.w, h: note.h });
   const [content, setContent] = useState(note.content || '');
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  
+
   const noteRef = useRef(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const dragStartPos = useRef({ x: 0, y: 0 });
   const textareaRef = useRef(null);
 
   // Sincronizar con props cuando cambian externamente
@@ -60,21 +73,36 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
     setContent(note.content || '');
   }, [note.content]);
 
+  // Visual position (with group drag offset applied)
+  const visualX = position.x + (groupDragOffset ? groupDragOffset.dx : 0);
+  const visualY = position.y + (groupDragOffset ? groupDragOffset.dy : 0);
+
   // === DRAG ===
   const handleMouseDown = (e) => {
+    // Solo left-click para drag (right-click es selección del canvas)
+    if (e.button !== 0) return;
     // Ignorar si es el resize handle o el textarea
-    if (e.target.classList.contains('resize-handle') || 
+    if (e.target.classList.contains('resize-handle') ||
         e.target.tagName === 'TEXTAREA') {
       return;
     }
-    
+
     e.preventDefault();
+
+    // Si esta nota no está seleccionada, limpiar la multi-selección
+    if (!isSelected && onClearSelection) {
+      onClearSelection();
+    }
+
     setIsDragging(true);
-    
-    const rect = noteRef.current.getBoundingClientRect();
+    dragStartPos.current = { x: position.x, y: position.y };
+
+    // Calcular offset del click respecto a la posición de la nota en coords mundo
+    const vpRect = viewportRef.current.getBoundingClientRect();
+    const worldClick = screenToWorld(e.clientX, e.clientY, vpRect);
     dragOffset.current = {
-      x: (e.clientX - rect.left) / zoom,
-      y: (e.clientY - rect.top) / zoom
+      x: worldClick.x - position.x,
+      y: worldClick.y - position.y
     };
 
     // Traer al frente al hacer click
@@ -87,17 +115,32 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
     if (!isDragging) return;
 
     const handleMouseMove = (e) => {
-      const canvas = noteRef.current.parentElement;
-      const canvasRect = canvas.getBoundingClientRect();
+      const vpRect = viewportRef.current.getBoundingClientRect();
+      const world = screenToWorld(e.clientX, e.clientY, vpRect);
 
-      const newX = Math.max(0, (e.clientX - canvasRect.left) / zoom - dragOffset.current.x);
-      const newY = Math.max(0, (e.clientY - canvasRect.top) / zoom - dragOffset.current.y);
+      const newX = Math.max(0, world.x - dragOffset.current.x);
+      const newY = Math.max(0, world.y - dragOffset.current.y);
 
       setPosition({ x: newX, y: newY });
+
+      // Report delta for group drag
+      if (isMultiSelected && onGroupDragMove) {
+        const dx = newX - dragStartPos.current.x;
+        const dy = newY - dragStartPos.current.y;
+        onGroupDragMove(note.id, dx, dy);
+      }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+
+      // Report group drag end
+      if (isMultiSelected && onGroupDragEnd) {
+        const dx = position.x - dragStartPos.current.x;
+        const dy = position.y - dragStartPos.current.y;
+        onGroupDragEnd(note.id, dx, dy);
+      }
+
       // PATCH solo al soltar
       if (position.x !== note.x || position.y !== note.y) {
         onUpdate(note.id, { x: Math.round(position.x), y: Math.round(position.y) });
@@ -111,7 +154,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, position, note.x, note.y, note.id, onUpdate, zoom]);
+  }, [isDragging, position, note.x, note.y, note.id, onUpdate, screenToWorld, viewportRef, isMultiSelected, onGroupDragMove, onGroupDragEnd]);
 
   // === RESIZE ===
   const handleResizeStart = (e) => {
@@ -124,9 +167,11 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
     if (!isResizing) return;
 
     const handleMouseMove = (e) => {
-      const rect = noteRef.current.getBoundingClientRect();
-      const newW = Math.max(150, (e.clientX - rect.left) / zoom);
-      const newH = Math.max(100, (e.clientY - rect.top) / zoom);
+      const vpRect = viewportRef.current.getBoundingClientRect();
+      const world = screenToWorld(e.clientX, e.clientY, vpRect);
+
+      const newW = Math.max(150, world.x - position.x);
+      const newH = Math.max(100, world.y - position.y);
 
       setSize({ w: newW, h: newH });
     };
@@ -146,7 +191,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, size, note.w, note.h, note.id, onUpdate, zoom]);
+  }, [isResizing, size, position, note.w, note.h, note.id, onUpdate, screenToWorld, viewportRef]);
 
   // === EDICIÓN ===
   const handleContentChange = (e) => {
@@ -182,14 +227,16 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       className="note"
       style={{
         position: 'absolute',
-        left: position.x,
-        top: position.y,
+        left: visualX,
+        top: visualY,
         width: size.w,
         height: size.h,
         backgroundColor: noteColor,
         zIndex: note.z_index,
         cursor: isDragging ? 'grabbing' : 'grab',
-        boxShadow: '2px 2px 8px rgba(0,0,0,0.15)',
+        boxShadow: isSelected
+          ? '0 0 0 3px rgba(66, 133, 244, 0.8), 2px 2px 8px rgba(0,0,0,0.15)'
+          : '2px 2px 8px rgba(0,0,0,0.15)',
         borderRadius: '4px',
         display: 'flex',
         flexDirection: 'column',
@@ -224,7 +271,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
             />
           ))}
         </div>
-        
+
         <button
           onClick={handleDelete}
           style={{
