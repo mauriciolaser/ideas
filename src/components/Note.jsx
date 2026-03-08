@@ -28,7 +28,7 @@ function isValidHexColor(color) {
  * - onBringToFront: función para traer al frente (noteId)
  * - maxZIndex: z_index máximo actual del canvas
  */
-export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZIndex }) {
+export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZIndex, zoom = 1 }) {
   // Color validado con fallback a amarillo
   const noteColor = isValidHexColor(note.color) ? note.color : DEFAULT_COLOR;
   
@@ -73,8 +73,8 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
     
     const rect = noteRef.current.getBoundingClientRect();
     dragOffset.current = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: (e.clientX - rect.left) / zoom,
+      y: (e.clientY - rect.top) / zoom
     };
 
     // Traer al frente al hacer click
@@ -89,10 +89,10 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
     const handleMouseMove = (e) => {
       const canvas = noteRef.current.parentElement;
       const canvasRect = canvas.getBoundingClientRect();
-      
-      const newX = Math.max(0, e.clientX - canvasRect.left - dragOffset.current.x);
-      const newY = Math.max(0, e.clientY - canvasRect.top - dragOffset.current.y);
-      
+
+      const newX = Math.max(0, (e.clientX - canvasRect.left) / zoom - dragOffset.current.x);
+      const newY = Math.max(0, (e.clientY - canvasRect.top) / zoom - dragOffset.current.y);
+
       setPosition({ x: newX, y: newY });
     };
 
@@ -111,7 +111,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, position, note.x, note.y, note.id, onUpdate]);
+  }, [isDragging, position, note.x, note.y, note.id, onUpdate, zoom]);
 
   // === RESIZE ===
   const handleResizeStart = (e) => {
@@ -125,9 +125,9 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
 
     const handleMouseMove = (e) => {
       const rect = noteRef.current.getBoundingClientRect();
-      const newW = Math.max(150, e.clientX - rect.left);
-      const newH = Math.max(100, e.clientY - rect.top);
-      
+      const newW = Math.max(150, (e.clientX - rect.left) / zoom);
+      const newH = Math.max(100, (e.clientY - rect.top) / zoom);
+
       setSize({ w: newW, h: newH });
     };
 
@@ -146,7 +146,7 @@ export default function Note({ note, onUpdate, onDelete, onBringToFront, maxZInd
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, size, note.w, note.h, note.id, onUpdate]);
+  }, [isResizing, size, note.w, note.h, note.id, onUpdate, zoom]);
 
   // === EDICIÓN ===
   const handleContentChange = (e) => {

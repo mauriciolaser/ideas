@@ -59,16 +59,26 @@ export default function Board() {
   };
 
   const handleUpdateNote = async (noteId, updates) => {
+    // Guardar estado previo para rollback
+    const previousNotes = notes;
+
+    // Actualizar localmente de inmediato (optimistic update)
+    setNotes(prev =>
+      prev.map(note =>
+        note.id === noteId ? { ...note, ...updates } : note
+      )
+    );
+
+    // Persistir en backend
     try {
       const updatedNote = await updateNote(token, noteId, updates);
-      setNotes(prev => 
+      setNotes(prev =>
         prev.map(note => note.id === noteId ? updatedNote : note)
       );
     } catch (err) {
       console.error('Error al actualizar nota:', err);
-      // Revertir cambios locales recargando el tablero
-      const data = await getBoard(id, token);
-      setNotes(data.notes || []);
+      // Rollback: restaurar estado previo
+      setNotes(previousNotes);
     }
   };
 
@@ -82,23 +92,9 @@ export default function Board() {
     }
   };
 
-  const handleBringToFront = async (noteId) => {
+  const handleBringToFront = (noteId) => {
     const maxZ = notes.reduce((max, note) => Math.max(max, note.z_index || 1), 0);
-    const newZ = maxZ + 1;
-    
-    // Actualizar localmente primero para UI responsiva
-    setNotes(prev =>
-      prev.map(note => 
-        note.id === noteId ? { ...note, z_index: newZ } : note
-      )
-    );
-    
-    // Luego persistir
-    try {
-      await updateNote(token, noteId, { z_index: newZ });
-    } catch (err) {
-      console.error('Error al actualizar z_index:', err);
-    }
+    handleUpdateNote(noteId, { z_index: maxZ + 1 });
   };
 
   // === Render ===
