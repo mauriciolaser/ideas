@@ -1,0 +1,194 @@
+{
+  "meta": {
+    "defaultLanguage": "es",
+    "storage": {
+      "languageKey": "ideas-ui-language"
+    },
+    "dateLocale": {
+      "es": "es-PE",
+      "en": "en-GB"
+    }
+  },
+  "languages": {
+    "es": {
+      "label": "Español",
+      "flag": "🇵🇪"
+    },
+    "en": {
+      "label": "English",
+      "flag": "🇬🇧"
+    }
+  },
+  "text": {
+    "es": {
+      "common": {
+        "appName": "ideas",
+        "noteCount": {
+          "one": "{count} nota",
+          "other": "{count} notas"
+        }
+      },
+      "language": {
+        "switchTo": "Cambiar a {language}",
+        "label": "Idioma"
+      },
+      "home": {
+        "tagline": "Notas colaborativas en canvas libre",
+        "boardNamePlaceholder": "Nombre del tablero (opcional)",
+        "createButton": "+ Nuevo tablero",
+        "creatingButton": "Creando...",
+        "persistenceNote": "Persistencia local por navegador con backup JSON.",
+        "exportButton": "Exportar",
+        "importButton": "Importar",
+        "importingButton": "Importando...",
+        "activeBoardsTitle": "Tableros activos",
+        "archivedBoardsTitle": "Tableros archivados",
+        "activeTab": "Activos",
+        "archivedTab": "Archivados",
+        "loadingBoards": "Cargando tableros...",
+        "emptyArchived": "No hay tableros archivados.",
+        "emptyActive": "No hay tableros creados aún. ¡Crea el primero!",
+        "archiveAction": "Archivar",
+        "unarchiveAction": "Desarchivar",
+        "archiveConfirm": "¿{action} \"{title}\"?",
+        "archiveError": "Error al {action}: {message}",
+        "exportFileName": "ideas-backup-{timestamp}.json",
+        "footerNote": "MVP - Sin login, persistencia local en este navegador",
+        "loadBoardsError": "Error al cargar tableros",
+        "createBoardError": "Error al crear tablero",
+        "exportError": "Error al exportar datos",
+        "importError": "Error al importar datos",
+        "untitledBoard": "Sin título"
+      },
+      "board": {
+        "missingId": "Falta ID de tablero en la URL",
+        "loadBoardError": "Error al cargar el tablero",
+        "loading": "Cargando tablero...",
+        "errorLabel": "Error: {message}",
+        "expectedUrl": "URL esperada: /board/ID",
+        "createNoteError": "Error al crear nota: {message}",
+        "deleteNoteError": "Error al eliminar nota: {message}"
+      },
+      "canvas": {
+        "emptyTitle": "No hay notas todavía",
+        "emptySubtitle": "Haz doble click o usa el botón + para crear una nota",
+        "newNoteTitle": "Nueva nota (o doble click en el canvas)"
+      },
+      "note": {
+        "changeColorTitle": "Cambiar color",
+        "deleteTitle": "Eliminar nota",
+        "deleteConfirm": "¿Eliminar esta nota?",
+        "placeholder": "Escribe aquí..."
+      },
+      "zoom": {
+        "zoomOut": "Alejar",
+        "reset": "Restablecer zoom (100%)",
+        "zoomIn": "Acercar"
+      },
+      "errors": {
+        "storage_unavailable": "localStorage no está disponible en este entorno.",
+        "storage_access_denied": "No se pudo acceder a localStorage. Revisa los permisos de almacenamiento del navegador.",
+        "import_invalid_structure": "La estructura importada no es válida.",
+        "import_missing_arrays": "El archivo importado debe incluir arrays de boards y notes.",
+        "import_invalid_board_ids": "Todos los boards importados deben tener un id válido.",
+        "import_duplicate_board_ids": "Los boards importados tienen ids duplicados.",
+        "import_invalid_note_ids": "Todas las notes importadas deben tener ids válidos.",
+        "import_duplicate_note_ids": "Las notes importadas tienen ids duplicados.",
+        "import_notes_without_board": "Hay notes importadas que apuntan a boards inexistentes.",
+        "data_read_failed": "No se pudieron leer los datos guardados.",
+        "board_not_found": "Board no encontrado.",
+        "note_not_found": "Nota no encontrada.",
+        "note_board_id_required": "board_id requerido.",
+        "note_no_fields": "No hay campos para actualizar.",
+        "note_no_valid_fields": "No hay campos válidos para actualizar.",
+        "import_invalid_json": "El archivo seleccionado no contiene JSON válido.",
+        "unknown_error": "Ocurrió un error inesperado."
+      }
+    },
+    "en": {
+      "common": {
+        "appName": "ideas",
+        "noteCount": {
+          "one": "{count} note",
+          "other": "{count} notes"
+        }
+      },
+      "language": {
+        "switchTo": "Switch to {language}",
+        "label": "Language"
+      },
+      "home": {
+        "tagline": "Collaborative notes on a freeform canvas",
+        "boardNamePlaceholder": "Board name (optional)",
+        "createButton": "+ New board",
+        "creatingButton": "Creating...",
+        "persistenceNote": "Local persistence per browser with JSON backup.",
+        "exportButton": "Export",
+        "importButton": "Import",
+        "importingButton": "Importing...",
+        "activeBoardsTitle": "Active boards",
+        "archivedBoardsTitle": "Archived boards",
+        "activeTab": "Active",
+        "archivedTab": "Archived",
+        "loadingBoards": "Loading boards...",
+        "emptyArchived": "No archived boards.",
+        "emptyActive": "No boards yet. Create the first one!",
+        "archiveAction": "Archive",
+        "unarchiveAction": "Unarchive",
+        "archiveConfirm": "Are you sure you want to {action} \"{title}\"?",
+        "archiveError": "Error while {action}: {message}",
+        "exportFileName": "ideas-backup-{timestamp}.json",
+        "footerNote": "MVP - No login, local persistence in this browser",
+        "loadBoardsError": "Error loading boards",
+        "createBoardError": "Error creating board",
+        "exportError": "Error exporting data",
+        "importError": "Error importing data",
+        "untitledBoard": "Untitled"
+      },
+      "board": {
+        "missingId": "Missing board ID in the URL",
+        "loadBoardError": "Error loading board",
+        "loading": "Loading board...",
+        "errorLabel": "Error: {message}",
+        "expectedUrl": "Expected URL: /board/ID",
+        "createNoteError": "Error creating note: {message}",
+        "deleteNoteError": "Error deleting note: {message}"
+      },
+      "canvas": {
+        "emptyTitle": "No notes yet",
+        "emptySubtitle": "Double-click or use the + button to create a note",
+        "newNoteTitle": "New note (or double-click on the canvas)"
+      },
+      "note": {
+        "changeColorTitle": "Change color",
+        "deleteTitle": "Delete note",
+        "deleteConfirm": "Delete this note?",
+        "placeholder": "Write here..."
+      },
+      "zoom": {
+        "zoomOut": "Zoom out",
+        "reset": "Reset zoom (100%)",
+        "zoomIn": "Zoom in"
+      },
+      "errors": {
+        "storage_unavailable": "localStorage is not available in this environment.",
+        "storage_access_denied": "Couldn't access localStorage. Check your browser storage permissions.",
+        "import_invalid_structure": "Imported structure is invalid.",
+        "import_missing_arrays": "Imported file must include boards and notes arrays.",
+        "import_invalid_board_ids": "All imported boards must have a valid id.",
+        "import_duplicate_board_ids": "Imported boards have duplicate ids.",
+        "import_invalid_note_ids": "All imported notes must have valid ids.",
+        "import_duplicate_note_ids": "Imported notes have duplicate ids.",
+        "import_notes_without_board": "Some imported notes refer to non-existent boards.",
+        "data_read_failed": "Couldn't read saved data.",
+        "board_not_found": "Board not found.",
+        "note_not_found": "Note not found.",
+        "note_board_id_required": "board_id required.",
+        "note_no_fields": "No fields to update.",
+        "note_no_valid_fields": "No valid fields to update.",
+        "import_invalid_json": "Selected file does not contain valid JSON.",
+        "unknown_error": "Something went wrong."
+      }
+    }
+  }
+}

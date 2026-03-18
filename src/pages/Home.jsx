@@ -7,6 +7,7 @@ import {
   importIdeasData,
   listBoards,
 } from '../api/boardApi';
+import { useUi } from '../hooks/useUi';
 
 /**
  * Página Home - Crear nuevo tablero o acceder a uno existente
@@ -14,6 +15,7 @@ import {
 export default function Home() {
   const navigate = useNavigate();
   const importInputRef = useRef(null);
+  const { t, language, ui, getErrorMessage } = useUi();
 
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,11 +33,11 @@ export default function Home() {
       setError(null);
     } catch (err) {
       console.error('Error cargando tableros:', err);
-      setError(err.message || 'Error al cargar tableros');
+      setError(getErrorMessage(err, 'home.loadBoardsError'));
     } finally {
       setLoadingBoards(false);
     }
-  }, [showArchived]);
+  }, [getErrorMessage, showArchived]);
 
   useEffect(() => {
     void loadBoards();
@@ -47,10 +49,10 @@ export default function Home() {
     setError(null);
 
     try {
-      const board = await createBoard(title || 'Untitled');
+      const board = await createBoard(title || t('home.untitledBoard'));
       navigate(`/board/${board.id}`);
     } catch (err) {
-      setError(err.message || 'Error al crear tablero');
+      setError(getErrorMessage(err, 'home.createBoardError'));
       setLoading(false);
     }
   };
@@ -62,8 +64,9 @@ export default function Home() {
   const handleArchive = async (e, board, archive) => {
     e.stopPropagation();
 
-    const action = archive ? 'archivar' : 'desarchivar';
-    if (!confirm(`¿${archive ? 'Archivar' : 'Desarchivar'} "${board.title}"?`)) {
+    const actionLabel = archive ? t('home.archiveAction') : t('home.unarchiveAction');
+    const actionLower = actionLabel.toLowerCase();
+    if (!confirm(t('home.archiveConfirm', { action: actionLabel, title: board.title }))) {
       return;
     }
 
@@ -71,7 +74,7 @@ export default function Home() {
       await archiveBoard(board.id, archive);
       await loadBoards();
     } catch (err) {
-      alert(`Error al ${action}: ${err.message}`);
+      alert(t('home.archiveError', { action: actionLower, message: getErrorMessage(err) }));
     }
   };
 
@@ -85,13 +88,13 @@ export default function Home() {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
       link.href = url;
-      link.download = `ideas-backup-${timestamp}.json`;
+      link.download = t('home.exportFileName', { timestamp });
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err.message || 'Error al exportar datos');
+      setError(getErrorMessage(err, 'home.exportError'));
     }
   };
 
@@ -114,7 +117,7 @@ export default function Home() {
       await importIdeasData(fileContents);
       await loadBoards();
     } catch (err) {
-      setError(err.message || 'Error al importar datos');
+      setError(getErrorMessage(err, 'home.importError'));
     } finally {
       e.target.value = '';
       setImporting(false);
@@ -123,7 +126,8 @@ export default function Home() {
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('es-ES', {
+    const locale = ui?.meta?.dateLocale?.[language] || 'es-PE';
+    return date.toLocaleDateString(locale, {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -165,14 +169,14 @@ export default function Home() {
             fontSize: '28px',
             color: '#333',
           }}>
-            ideas
+            {t('common.appName')}
           </h1>
           <p style={{
             color: '#666',
             marginBottom: '24px',
             fontSize: '14px',
           }}>
-            Notas colaborativas en canvas libre
+            {t('home.tagline')}
           </p>
 
           <form onSubmit={handleCreate} style={{ display: 'flex', gap: '12px' }}>
@@ -180,7 +184,7 @@ export default function Home() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Nombre del tablero (opcional)"
+              placeholder={t('home.boardNamePlaceholder')}
               style={{
                 flex: 1,
                 padding: '12px 16px',
@@ -206,7 +210,7 @@ export default function Home() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {loading ? 'Creando...' : '+ Nuevo tablero'}
+              {loading ? t('home.creatingButton') : t('home.createButton')}
             </button>
           </form>
 
@@ -222,7 +226,7 @@ export default function Home() {
               fontSize: '12px',
               color: '#888',
             }}>
-              Persistencia local por navegador con backup JSON.
+              {t('home.persistenceNote')}
             </span>
 
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -231,7 +235,7 @@ export default function Home() {
                 onClick={handleExport}
                 style={utilityButtonStyle}
               >
-                Exportar
+                {t('home.exportButton')}
               </button>
               <button
                 type="button"
@@ -243,7 +247,7 @@ export default function Home() {
                   cursor: importing ? 'not-allowed' : 'pointer',
                 }}
               >
-                {importing ? 'Importando...' : 'Importar'}
+                {importing ? t('home.importingButton') : t('home.importButton')}
               </button>
               <input
                 ref={importInputRef}
@@ -275,7 +279,7 @@ export default function Home() {
               fontWeight: '600',
               margin: 0,
             }}>
-              {showArchived ? 'Tableros archivados' : 'Tableros activos'}
+              {showArchived ? t('home.archivedBoardsTitle') : t('home.activeBoardsTitle')}
             </h2>
 
             <div style={{
@@ -299,7 +303,7 @@ export default function Home() {
                   transition: 'all 0.15s',
                 }}
               >
-                Activos
+                {t('home.activeTab')}
               </button>
               <button
                 onClick={() => setShowArchived(true)}
@@ -315,14 +319,14 @@ export default function Home() {
                   transition: 'all 0.15s',
                 }}
               >
-                Archivados
+                {t('home.archivedTab')}
               </button>
             </div>
           </div>
 
           {loadingBoards ? (
             <p style={{ color: '#888', textAlign: 'center', padding: '40px' }}>
-              Cargando tableros...
+              {t('home.loadingBoards')}
             </p>
           ) : boards.length === 0 ? (
             <div style={{
@@ -333,8 +337,8 @@ export default function Home() {
               color: '#888',
             }}>
               {showArchived
-                ? 'No hay tableros archivados.'
-                : 'No hay tableros creados aún. ¡Crea el primero!'}
+                ? t('home.emptyArchived')
+                : t('home.emptyActive')}
             </div>
           ) : (
             <div style={{
@@ -369,7 +373,7 @@ export default function Home() {
                 >
                   <button
                     onClick={(e) => handleArchive(e, board, !showArchived)}
-                    title={showArchived ? 'Desarchivar' : 'Archivar'}
+                    title={showArchived ? t('home.unarchiveAction') : t('home.archiveAction')}
                     style={{
                       position: 'absolute',
                       top: '12px',
@@ -427,7 +431,7 @@ export default function Home() {
                       padding: '4px 8px',
                       borderRadius: '4px',
                     }}>
-                      {board.note_count} {board.note_count === 1 ? 'nota' : 'notas'}
+                      {t('common.noteCount', { count: board.note_count })}
                     </span>
                     <span>
                       {formatDate(showArchived ? board.archived_at : board.updated_at)}
@@ -445,7 +449,7 @@ export default function Home() {
           color: '#aaa',
           textAlign: 'center',
         }}>
-          MVP - Sin login, persistencia local en este navegador
+          {t('home.footerNote')}
         </p>
       </div>
     </div>

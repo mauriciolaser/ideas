@@ -1,10 +1,22 @@
+import uiData from '../data/ui.json';
+
 const STORAGE_KEY = 'ideas-app-data';
 const STORAGE_VERSION = 1;
 const DEFAULT_NOTE_COLOR = '#FFFFA5';
 const DEFAULT_NOTE_WIDTH = 200;
 const DEFAULT_NOTE_HEIGHT = 150;
-const DEFAULT_BOARD_TITLE = 'Untitled';
+const DEFAULT_LANGUAGE = uiData?.meta?.defaultLanguage || 'es';
+const DEFAULT_BOARD_TITLE = uiData?.text?.[DEFAULT_LANGUAGE]?.home?.untitledBoard || 'Untitled';
 const ALLOWED_NOTE_FIELDS = new Set(['x', 'y', 'w', 'h', 'content', 'color', 'z_index']);
+
+function createUiError(code, meta) {
+  const error = new Error(code);
+  error.code = code;
+  if (meta) {
+    error.meta = meta;
+  }
+  return error;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -28,7 +40,7 @@ function createEmptyData() {
 
 function ensureStorage() {
   if (typeof window === 'undefined' || !window.localStorage) {
-    throw new Error('localStorage no está disponible en este entorno.');
+    throw createUiError('storage_unavailable');
   }
 
   try {
@@ -36,7 +48,7 @@ function ensureStorage() {
     window.localStorage.setItem(probeKey, '1');
     window.localStorage.removeItem(probeKey);
   } catch {
-    throw new Error('No se pudo acceder a localStorage. Revisa los permisos de almacenamiento del navegador.');
+    throw createUiError('storage_access_denied');
   }
 }
 
@@ -87,7 +99,7 @@ function normalizeNote(note, fallbackDate) {
 
 function sanitizeDataShape(input) {
   if (!input || typeof input !== 'object') {
-    throw new Error('La estructura importada no es valida.');
+    throw createUiError('import_invalid_structure');
   }
 
   const fallbackDate = nowIso();
@@ -95,33 +107,33 @@ function sanitizeDataShape(input) {
   const notesInput = Array.isArray(input.notes) ? input.notes : null;
 
   if (!boardsInput || !notesInput) {
-    throw new Error('El archivo importado debe incluir arrays de boards y notes.');
+    throw createUiError('import_missing_arrays');
   }
 
   const boards = boardsInput.map((board) => normalizeBoard(board, fallbackDate));
 
   if (boards.some((board) => board.id <= 0)) {
-    throw new Error('Todos los boards importados deben tener un id valido.');
+    throw createUiError('import_invalid_board_ids');
   }
 
   const boardIds = new Set(boards.map((board) => board.id));
 
   if (boardIds.size !== boards.length) {
-    throw new Error('Los boards importados tienen ids duplicados.');
+    throw createUiError('import_duplicate_board_ids');
   }
 
   const notes = notesInput.map((note) => normalizeNote(note, fallbackDate));
 
   if (notes.some((note) => note.id <= 0 || note.board_id <= 0)) {
-    throw new Error('Todas las notes importadas deben tener ids validos.');
+    throw createUiError('import_invalid_note_ids');
   }
 
   if (new Set(notes.map((note) => note.id)).size !== notes.length) {
-    throw new Error('Las notes importadas tienen ids duplicados.');
+    throw createUiError('import_duplicate_note_ids');
   }
 
   if (notes.some((note) => !boardIds.has(note.board_id))) {
-    throw new Error('Hay notes importadas que apuntan a boards inexistentes.');
+    throw createUiError('import_notes_without_board');
   }
 
   const maxBoardId = boards.reduce((max, board) => Math.max(max, board.id), 0);
@@ -151,10 +163,10 @@ function readData() {
   try {
     return sanitizeDataShape(JSON.parse(raw));
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`No se pudieron leer los datos guardados: ${error.message}`);
+    if (error && error.code) {
+      throw error;
     }
-    throw new Error('No se pudieron leer los datos guardados.');
+    throw createUiError('data_read_failed');
   }
 }
 
@@ -175,7 +187,7 @@ function getBoardOrThrow(data, boardId) {
   const board = data.boards.find((item) => item.id === normalizedBoardId);
 
   if (!board) {
-    throw new Error('Board not found');
+    throw createUiError('board_not_found');
   }
 
   return board;
@@ -186,7 +198,7 @@ function getNoteOrThrow(data, noteId) {
   const note = data.notes.find((item) => item.id === normalizedNoteId);
 
   if (!note) {
-    throw new Error('Note not found');
+    throw createUiError('note_not_found');
   }
 
   return note;
@@ -285,7 +297,7 @@ export async function archiveBoard(boardId, archived) {
 
 export async function createNote(noteData) {
   if (!noteData || !noteData.board_id) {
-    throw new Error('board_id required');
+    throw createUiError('note_board_id_required');
   }
 
   const timestamp = nowIso();
@@ -322,7 +334,7 @@ export async function createNote(noteData) {
 
 export async function updateNote(noteId, updates) {
   if (!updates || Object.keys(updates).length === 0) {
-    throw new Error('No fields to update');
+    throw createUiError('note_no_fields');
   }
 
   const timestamp = nowIso();
@@ -357,7 +369,7 @@ export async function updateNote(noteId, updates) {
     });
 
     if (!hasValidField) {
-      throw new Error('No valid fields to update');
+      throw createUiError('note_no_valid_fields');
     }
 
     note.updated_at = timestamp;
@@ -394,7 +406,7 @@ export async function importIdeasData(jsonPayload) {
   try {
     parsed = JSON.parse(jsonPayload);
   } catch {
-    throw new Error('El archivo seleccionado no contiene JSON valido.');
+    throw createUiError('import_invalid_json');
   }
 
   const normalizedData = sanitizeDataShape(parsed);

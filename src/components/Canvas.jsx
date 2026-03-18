@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Note from './Note';
 import ZoomControls from './ZoomControls';
 import { useCanvasViewport } from '../hooks/useCanvasViewport';
+import { useUi } from '../hooks/useUi';
 
 function rectsIntersect(r1, r2) {
   return !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
@@ -24,6 +25,7 @@ export default function Canvas({
   onCreateNote,
   onBringToFront
 }) {
+  const { t } = useUi();
   const {
     zoom, pan, isPanning,
     viewportRef,
@@ -229,10 +231,10 @@ export default function Canvas({
             color: '#888',
           }}>
             <p style={{ fontSize: '18px', marginBottom: '8px' }}>
-              No hay notas todavía
+              {t('canvas.emptyTitle')}
             </p>
             <p style={{ fontSize: '14px' }}>
-              Haz doble click o usa el botón + para crear una nota
+              {t('canvas.emptySubtitle')}
             </p>
           </div>
         )}
@@ -316,7 +318,7 @@ export default function Canvas({
           justifyContent: 'center',
           zIndex: 9999,
         }}
-        title="Nueva nota (o doble click en el canvas)"
+        title={t('canvas.newNoteTitle')}
       >
         +
       </button>

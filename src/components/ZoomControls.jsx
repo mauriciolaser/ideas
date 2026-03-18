@@ -1,3 +1,5 @@
+import { useUi } from '../hooks/useUi';
+
 /**
  * Controles de zoom para el canvas
  *
@@ -10,6 +12,7 @@
  * - maxZoom: zoom máximo
  */
 export default function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, minZoom, maxZoom }) {
+  const { t } = useUi();
   const percentage = Math.round(zoom * 100);
 
   return (
@@ -43,7 +46,7 @@ export default function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, minZo
           alignItems: 'center',
           justifyContent: 'center',
         }}
-        title="Alejar"
+        title={t('zoom.zoomOut')}
       >
         −
       </button>
@@ -60,7 +63,7 @@ export default function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, minZo
           borderRadius: '4px',
           minWidth: '48px',
         }}
-        title="Restablecer zoom (100%)"
+        title={t('zoom.reset')}
       >
         {percentage}%
       </button>
@@ -81,7 +84,7 @@ export default function ZoomControls({ zoom, onZoomIn, onZoomOut, onReset, minZo
           alignItems: 'center',
           justifyContent: 'center',
         }}
-        title="Acercar"
+        title={t('zoom.zoomIn')}
       >
         +
       </button>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useUi } from '../hooks/useUi';
 
 // Color default para sticky notes (amarillo clásico)
 const DEFAULT_COLOR = '#FFFFA5';
@@ -41,6 +42,7 @@ export default function Note({
   groupDragOffset = null,
   onGroupDragMove, onGroupDragEnd, onClearSelection
 }) {
+  const { t } = useUi();
   // Color validado con fallback a amarillo
   const noteColor = isValidHexColor(note.color) ? note.color : DEFAULT_COLOR;
 
@@ -209,7 +211,7 @@ export default function Note({
   // === DELETE ===
   const handleDelete = (e) => {
     e.stopPropagation();
-    if (confirm('¿Eliminar esta nota?')) {
+    if (confirm(t('note.deleteConfirm'))) {
       onDelete(note.id);
     }
   };
@@ -268,7 +270,7 @@ export default function Note({
                 cursor: 'pointer',
                 padding: 0,
               }}
-              title="Cambiar color"
+              title={t('note.changeColorTitle')}
             />
           ))}
         </div>
@@ -283,7 +285,7 @@ export default function Note({
             color: '#666',
             padding: '2px 6px',
           }}
-          title="Eliminar nota"
+          title={t('note.deleteTitle')}
         >
           ✕
         </button>
@@ -295,7 +297,7 @@ export default function Note({
         value={content}
         onChange={handleContentChange}
         onBlur={handleContentBlur}
-        placeholder="Escribe aquí..."
+        placeholder={t('note.placeholder')}
         style={{
           flex: 1,
           border: 'none',

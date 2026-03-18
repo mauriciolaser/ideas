@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Canvas from '../components/Canvas';
 import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
+import { useUi } from '../hooks/useUi';
 
 /**
  * Página Board - Maneja el estado del tablero
@@ -10,6 +11,7 @@ import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
  */
 export default function Board() {
   const { id } = useParams();
+  const { t, getErrorMessage } = useUi();
 
   const [board, setBoard] = useState(null);
   const [notes, setNotes] = useState([]);
@@ -19,7 +21,7 @@ export default function Board() {
   useEffect(() => {
     async function loadBoard() {
       if (!id) {
-        setError('Falta ID de tablero en la URL');
+        setError(t('board.missingId'));
         setLoading(false);
         return;
       }
@@ -30,14 +32,14 @@ export default function Board() {
         setNotes(data.notes || []);
         setError(null);
       } catch (err) {
-        setError(err.message || 'Error al cargar el tablero');
+        setError(getErrorMessage(err, 'board.loadBoardError'));
       } finally {
         setLoading(false);
       }
     }
 
     loadBoard();
-  }, [id]);
+  }, [getErrorMessage, id, t]);
 
   const handleCreateNote = async (x, y) => {
     try {
@@ -49,7 +51,7 @@ export default function Board() {
       setNotes((prev) => [...prev, newNote]);
     } catch (err) {
       console.error('Error al crear nota:', err);
-      alert(`Error al crear nota: ${err.message}`);
+      alert(t('board.createNoteError', { message: getErrorMessage(err) }));
     }
   };
 
@@ -77,7 +79,7 @@ export default function Board() {
       setNotes((prev) => prev.filter((note) => note.id !== noteId));
     } catch (err) {
       console.error('Error al eliminar nota:', err);
-      alert(`Error al eliminar nota: ${err.message}`);
+      alert(t('board.deleteNoteError', { message: getErrorMessage(err) }));
     }
   };
 
@@ -96,7 +98,7 @@ export default function Board() {
         fontSize: '18px',
         color: '#666',
       }}>
-        Cargando tablero...
+        {t('board.loading')}
       </div>
     );
   }
@@ -113,9 +115,9 @@ export default function Board() {
         color: '#c00',
         gap: '16px',
       }}>
-        <div>Error: {error}</div>
+        <div>{t('board.errorLabel', { message: error })}</div>
         <div style={{ fontSize: '14px', color: '#666' }}>
-          URL esperada: /board/ID
+          {t('board.expectedUrl')}
         </div>
       </div>
     );
@@ -141,14 +143,14 @@ export default function Board() {
           fontSize: '18px',
           fontWeight: 500,
         }}>
-          {board?.title || 'ideas'}
+          {board?.title || t('common.appName')}
         </h1>
         <span style={{
           marginLeft: 'auto',
           fontSize: '12px',
           color: '#888',
         }}>
-          {notes.length} nota{notes.length !== 1 ? 's' : ''}
+          {t('common.noteCount', { count: notes.length })}
         </span>
       </header>
 
