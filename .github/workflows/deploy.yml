@@ -42,7 +42,7 @@ jobs:
               # 4) Crear archivo .env con variables de entorno
       - name: 🔐 Crear archivo .env
         run: |
-          echo "VITE_GA_ID=${{ secrets.VITE_GA_ID }}" >> .env
+          printf "VITE_GA_ID=%s\n" "${{ secrets.VITE_GA_ID }}" > .env
           echo "✔️  Variables de entorno configuradas"
 
       # 4) Compilar proyecto con Vite
