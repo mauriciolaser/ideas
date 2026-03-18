@@ -1,6 +1,6 @@
 <?php
 /**
- * IdeaBoard MVP - API Router
+ * ideas MVP - API Router
  * 
  * Punto de entrada único para todas las acciones
  * URL: /api/index.php?action=xxx

@@ -39,6 +39,12 @@ jobs:
       - name: 📦 Instalar yargs
         run: npm install yargs
 
+              # 4) Crear archivo .env con variables de entorno
+      - name: 🔐 Crear archivo .env
+        run: |
+          echo "VITE_GA_ID=${{ secrets.VITE_GA_ID }}" >> .env
+          echo "✔️  Variables de entorno configuradas"
+
       # 4) Compilar proyecto con Vite
       - name: 🏗️  Compilar proyecto
         run: |

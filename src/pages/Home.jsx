@@ -1,37 +1,46 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createBoard, listBoards, archiveBoard } from '../api/boardApi';
+import {
+  archiveBoard,
+  createBoard,
+  exportIdeasData,
+  importIdeasData,
+  listBoards,
+} from '../api/boardApi';
 
 /**
  * Página Home - Crear nuevo tablero o acceder a uno existente
  */
 export default function Home() {
   const navigate = useNavigate();
+  const importInputRef = useRef(null);
+
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [boards, setBoards] = useState([]);
   const [loadingBoards, setLoadingBoards] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
+  const [importing, setImporting] = useState(false);
 
-  // Cargar tableros al montar y cuando cambia el filtro
-  useEffect(() => {
-    loadBoards();
-  }, [showArchived]);
-
-  const loadBoards = async () => {
+  const loadBoards = useCallback(async () => {
     setLoadingBoards(true);
     try {
       const data = await listBoards(showArchived ? '1' : '0');
       setBoards(data.boards || []);
+      setError(null);
     } catch (err) {
       console.error('Error cargando tableros:', err);
+      setError(err.message || 'Error al cargar tableros');
     } finally {
       setLoadingBoards(false);
     }
-  };
+  }, [showArchived]);
 
-  // Crear nuevo tablero
+  useEffect(() => {
+    void loadBoards();
+  }, [loadBoards]);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -39,37 +48,79 @@ export default function Home() {
 
     try {
       const board = await createBoard(title || 'Untitled');
-      navigate(`/board/${board.id}?token=${board.token}`);
+      navigate(`/board/${board.id}`);
     } catch (err) {
       setError(err.message || 'Error al crear tablero');
       setLoading(false);
     }
   };
 
-  // Navegar a un tablero
   const goToBoard = (board) => {
-    navigate(`/board/${board.id}?token=${board.token}`);
+    navigate(`/board/${board.id}`);
   };
 
-  // Archivar/Desarchivar tablero
   const handleArchive = async (e, board, archive) => {
-    e.stopPropagation(); // Evitar navegación al tablero
-    
+    e.stopPropagation();
+
     const action = archive ? 'archivar' : 'desarchivar';
     if (!confirm(`¿${archive ? 'Archivar' : 'Desarchivar'} "${board.title}"?`)) {
       return;
     }
 
     try {
-      await archiveBoard(board.token, board.id, archive);
-      // Recargar lista
-      loadBoards();
+      await archiveBoard(board.id, archive);
+      await loadBoards();
     } catch (err) {
       alert(`Error al ${action}: ${err.message}`);
     }
   };
 
-  // Formatear fecha
+  const handleExport = async () => {
+    try {
+      setError(null);
+      const data = await exportIdeasData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+      link.href = url;
+      link.download = `ideas-backup-${timestamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || 'Error al exportar datos');
+    }
+  };
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportChange = async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setImporting(true);
+    setError(null);
+
+    try {
+      const fileContents = await file.text();
+      await importIdeasData(fileContents);
+      await loadBoards();
+    } catch (err) {
+      setError(err.message || 'Error al importar datos');
+    } finally {
+      e.target.value = '';
+      setImporting(false);
+    }
+  };
+
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('es-ES', {
@@ -77,8 +128,19 @@ export default function Home() {
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
+  };
+
+  const utilityButtonStyle = {
+    padding: '8px 12px',
+    fontSize: '13px',
+    fontWeight: '500',
+    backgroundColor: '#f7f7f7',
+    color: '#444',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    cursor: 'pointer',
   };
 
   return (
@@ -91,7 +153,6 @@ export default function Home() {
         maxWidth: '900px',
         margin: '0 auto',
       }}>
-        {/* Header con formulario de creación */}
         <div style={{
           backgroundColor: 'white',
           padding: '32px',
@@ -99,22 +160,21 @@ export default function Home() {
           boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
           marginBottom: '32px',
         }}>
-          <h1 style={{ 
+          <h1 style={{
             marginBottom: '8px',
             fontSize: '28px',
             color: '#333',
           }}>
-            IdeaBoard
+            ideas
           </h1>
-          <p style={{ 
-            color: '#666', 
+          <p style={{
+            color: '#666',
             marginBottom: '24px',
             fontSize: '14px',
           }}>
             Notas colaborativas en canvas libre
           </p>
 
-          {/* Formulario para crear tablero */}
           <form onSubmit={handleCreate} style={{ display: 'flex', gap: '12px' }}>
             <input
               type="text"
@@ -130,7 +190,7 @@ export default function Home() {
                 outline: 'none',
               }}
             />
-            
+
             <button
               type="submit"
               disabled={loading}
@@ -150,6 +210,51 @@ export default function Home() {
             </button>
           </form>
 
+          <div style={{
+            marginTop: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}>
+            <span style={{
+              fontSize: '12px',
+              color: '#888',
+            }}>
+              Persistencia local por navegador con backup JSON.
+            </span>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleExport}
+                style={utilityButtonStyle}
+              >
+                Exportar
+              </button>
+              <button
+                type="button"
+                onClick={handleImportClick}
+                disabled={importing}
+                style={{
+                  ...utilityButtonStyle,
+                  opacity: importing ? 0.7 : 1,
+                  cursor: importing ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {importing ? 'Importando...' : 'Importar'}
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json"
+                onChange={handleImportChange}
+                style={{ display: 'none' }}
+              />
+            </div>
+          </div>
+
           {error && (
             <p style={{ color: '#c00', marginTop: '12px', fontSize: '14px' }}>
               {error}
@@ -157,25 +262,22 @@ export default function Home() {
           )}
         </div>
 
-        {/* Lista de tableros */}
         <div>
-          {/* Header con filtro */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '16px',
           }}>
-            <h2 style={{ 
-              fontSize: '18px', 
-              color: '#555', 
+            <h2 style={{
+              fontSize: '18px',
+              color: '#555',
               fontWeight: '600',
               margin: 0,
             }}>
               {showArchived ? 'Tableros archivados' : 'Tableros activos'}
             </h2>
 
-            {/* Filtro tabs */}
             <div style={{
               display: 'flex',
               gap: '4px',
@@ -230,8 +332,8 @@ export default function Home() {
               textAlign: 'center',
               color: '#888',
             }}>
-              {showArchived 
-                ? 'No hay tableros archivados.' 
+              {showArchived
+                ? 'No hay tableros archivados.'
                 : 'No hay tableros creados aún. ¡Crea el primero!'}
             </div>
           ) : (
@@ -265,7 +367,6 @@ export default function Home() {
                     e.currentTarget.style.borderColor = 'transparent';
                   }}
                 >
-                  {/* Botón archivar/desarchivar */}
                   <button
                     onClick={(e) => handleArchive(e, board, !showArchived)}
                     title={showArchived ? 'Desarchivar' : 'Archivar'}
@@ -309,11 +410,11 @@ export default function Home() {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    paddingRight: '36px', // Espacio para el botón
+                    paddingRight: '36px',
                   }}>
                     {board.title}
                   </h3>
-                  
+
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -338,14 +439,13 @@ export default function Home() {
           )}
         </div>
 
-        {/* Footer */}
         <p style={{
           marginTop: '32px',
           fontSize: '12px',
           color: '#aaa',
           textAlign: 'center',
         }}>
-          MVP - Sin login, persistencia por token
+          MVP - Sin login, persistencia local en este navegador
         </p>
       </div>
     </div>

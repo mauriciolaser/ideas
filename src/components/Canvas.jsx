@@ -40,10 +40,20 @@ export default function Canvas({
   const [groupDragDelta, setGroupDragDelta] = useState(null);
 
   const selectionRectRef = useRef(null);
-  selectionRectRef.current = selectionRect;
-
   const notesRef = useRef(notes);
-  notesRef.current = notes;
+  const selectedNoteIdsRef = useRef(selectedNoteIds);
+
+  useEffect(() => {
+    selectionRectRef.current = selectionRect;
+  }, [selectionRect]);
+
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
+
+  useEffect(() => {
+    selectedNoteIdsRef.current = selectedNoteIds;
+  }, [selectedNoteIds]);
 
   // Calcular z_index máximo
   const maxZIndex = notes.reduce((max, note) =>
@@ -152,9 +162,6 @@ export default function Canvas({
   const handleGroupDragMove = useCallback((sourceNoteId, dx, dy) => {
     setGroupDragDelta({ dx, dy, sourceNoteId });
   }, []);
-
-  const selectedNoteIdsRef = useRef(selectedNoteIds);
-  selectedNoteIdsRef.current = selectedNoteIds;
 
   const handleGroupDragEnd = useCallback((sourceNoteId, dx, dy) => {
     setGroupDragDelta(null);

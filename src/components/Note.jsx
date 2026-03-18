@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Color default para sticky notes (amarillo clásico)
 const DEFAULT_COLOR = '#FFFFA5';
@@ -36,7 +36,7 @@ function isValidHexColor(color) {
  */
 export default function Note({
   note, onUpdate, onDelete, onBringToFront, maxZIndex,
-  zoom = 1, viewportRef, screenToWorld,
+  viewportRef, screenToWorld,
   isSelected = false, isMultiSelected = false,
   groupDragOffset = null,
   onGroupDragMove, onGroupDragEnd, onClearSelection
@@ -44,9 +44,9 @@ export default function Note({
   // Color validado con fallback a amarillo
   const noteColor = isValidHexColor(note.color) ? note.color : DEFAULT_COLOR;
 
-  // Estado local para posición/tamaño durante drag/resize
-  const [position, setPosition] = useState({ x: note.x, y: note.y });
-  const [size, setSize] = useState({ w: note.w, h: note.h });
+  // Estado local para interacción en curso
+  const [dragPosition, setDragPosition] = useState(null);
+  const [draftSize, setDraftSize] = useState(null);
   const [content, setContent] = useState(note.content || '');
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -54,24 +54,14 @@ export default function Note({
   const noteRef = useRef(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const dragStartPos = useRef({ x: 0, y: 0 });
+  const dragPositionRef = useRef({ x: note.x, y: note.y });
+  const resizeSizeRef = useRef({ w: note.w, h: note.h });
   const textareaRef = useRef(null);
 
-  // Sincronizar con props cuando cambian externamente
-  useEffect(() => {
-    if (!isDragging) {
-      setPosition({ x: note.x, y: note.y });
-    }
-  }, [note.x, note.y, isDragging]);
-
-  useEffect(() => {
-    if (!isResizing) {
-      setSize({ w: note.w, h: note.h });
-    }
-  }, [note.w, note.h, isResizing]);
-
-  useEffect(() => {
-    setContent(note.content || '');
-  }, [note.content]);
+  const position = dragPosition ?? { x: note.x, y: note.y };
+  const size = draftSize ?? { w: note.w, h: note.h };
+  const positionX = dragPosition?.x ?? note.x;
+  const positionY = dragPosition?.y ?? note.y;
 
   // Visual position (with group drag offset applied)
   const visualX = position.x + (groupDragOffset ? groupDragOffset.dx : 0);
@@ -96,6 +86,8 @@ export default function Note({
 
     setIsDragging(true);
     dragStartPos.current = { x: position.x, y: position.y };
+    dragPositionRef.current = { x: position.x, y: position.y };
+    setDragPosition({ x: position.x, y: position.y });
 
     // Calcular offset del click respecto a la posición de la nota en coords mundo
     const vpRect = viewportRef.current.getBoundingClientRect();
@@ -121,7 +113,8 @@ export default function Note({
       const newX = Math.max(0, world.x - dragOffset.current.x);
       const newY = Math.max(0, world.y - dragOffset.current.y);
 
-      setPosition({ x: newX, y: newY });
+      dragPositionRef.current = { x: newX, y: newY };
+      setDragPosition({ x: newX, y: newY });
 
       // Report delta for group drag
       if (isMultiSelected && onGroupDragMove) {
@@ -133,18 +126,21 @@ export default function Note({
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      const finalPosition = dragPositionRef.current;
 
       // Report group drag end
       if (isMultiSelected && onGroupDragEnd) {
-        const dx = position.x - dragStartPos.current.x;
-        const dy = position.y - dragStartPos.current.y;
+        const dx = finalPosition.x - dragStartPos.current.x;
+        const dy = finalPosition.y - dragStartPos.current.y;
         onGroupDragEnd(note.id, dx, dy);
       }
 
       // PATCH solo al soltar
-      if (position.x !== note.x || position.y !== note.y) {
-        onUpdate(note.id, { x: Math.round(position.x), y: Math.round(position.y) });
+      if (finalPosition.x !== note.x || finalPosition.y !== note.y) {
+        onUpdate(note.id, { x: Math.round(finalPosition.x), y: Math.round(finalPosition.y) });
       }
+
+      setDragPosition(null);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -154,12 +150,14 @@ export default function Note({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, position, note.x, note.y, note.id, onUpdate, screenToWorld, viewportRef, isMultiSelected, onGroupDragMove, onGroupDragEnd]);
+  }, [isDragging, note.x, note.y, note.id, onUpdate, screenToWorld, viewportRef, isMultiSelected, onGroupDragMove, onGroupDragEnd]);
 
   // === RESIZE ===
   const handleResizeStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    resizeSizeRef.current = { w: size.w, h: size.h };
+    setDraftSize({ w: size.w, h: size.h });
     setIsResizing(true);
   };
 
@@ -170,18 +168,21 @@ export default function Note({
       const vpRect = viewportRef.current.getBoundingClientRect();
       const world = screenToWorld(e.clientX, e.clientY, vpRect);
 
-      const newW = Math.max(150, world.x - position.x);
-      const newH = Math.max(100, world.y - position.y);
+      const newW = Math.max(150, world.x - positionX);
+      const newH = Math.max(100, world.y - positionY);
 
-      setSize({ w: newW, h: newH });
+      resizeSizeRef.current = { w: newW, h: newH };
+      setDraftSize({ w: newW, h: newH });
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      const finalSize = resizeSizeRef.current;
       // PATCH solo al soltar
-      if (size.w !== note.w || size.h !== note.h) {
-        onUpdate(note.id, { w: Math.round(size.w), h: Math.round(size.h) });
+      if (finalSize.w !== note.w || finalSize.h !== note.h) {
+        onUpdate(note.id, { w: Math.round(finalSize.w), h: Math.round(finalSize.h) });
       }
+      setDraftSize(null);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -191,7 +192,7 @@ export default function Note({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, size, position, note.w, note.h, note.id, onUpdate, screenToWorld, viewportRef]);
+  }, [isResizing, positionX, positionY, note.w, note.h, note.id, onUpdate, screenToWorld, viewportRef]);
 
   // === EDICIÓN ===
   const handleContentChange = (e) => {

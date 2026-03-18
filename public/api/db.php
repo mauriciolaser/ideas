@@ -1,32 +1,33 @@
 <?php
 /**
- * IdeaBoard MVP - Conexión a Base de Datos
- * 
- * Configuración MySQLi y funciones helper
+ * Legacy ideas MVP - Conexión a Base de Datos
+ *
+ * Este archivo ya no es usado por la aplicación React actual.
+ * Se conserva solo como referencia para quien quiera reactivar el backend PHP/MySQL.
  */
 
-// Configuración de la base de datos
+// Configuración de ejemplo. Reemplazar con credenciales propias si se reactiva este backend.
 define('DB_HOST', 'localhost');
-define('DB_USER', 'vallhzty_board');
-define('DB_PASS', '!!Afar34239!!Pp');
-define('DB_NAME', 'vallhzty_board');
+define('DB_USER', 'CHANGE_ME');
+define('DB_PASS', 'CHANGE_ME');
+define('DB_NAME', 'CHANGE_ME');
 
 /**
  * Obtiene la conexión MySQLi (singleton)
  */
 function getDB(): mysqli {
     static $conn = null;
-    
+
     if ($conn === null) {
         $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-        
+
         if ($conn->connect_error) {
             sendError(500, 'Database connection failed');
         }
-        
+
         $conn->set_charset('utf8mb4');
     }
-    
+
     return $conn;
 }
 
@@ -51,21 +52,17 @@ function sendError(int $code, string $message): never {
  * Obtiene el token del request (header o query param)
  */
 function getToken(): ?string {
-    // Primero intenta header
     $headers = getallheaders();
     if (isset($headers['X-BOARD-TOKEN'])) {
         return $headers['X-BOARD-TOKEN'];
     }
-    // También buscar en minúsculas (algunos servidores)
     if (isset($headers['x-board-token'])) {
         return $headers['x-board-token'];
     }
-    
-    // Luego query param
     if (isset($_GET['token'])) {
         return $_GET['token'];
     }
-    
+
     return null;
 }
 
@@ -75,11 +72,11 @@ function getToken(): ?string {
  */
 function validateBoardToken(int $boardId): array {
     $token = getToken();
-    
+
     if (!$token) {
         sendError(403, 'Token required');
     }
-    
+
     $db = getDB();
     $stmt = $db->prepare('SELECT id, title, token, created_at, updated_at FROM boards WHERE id = ?');
     $stmt->bind_param('i', $boardId);
@@ -87,15 +84,15 @@ function validateBoardToken(int $boardId): array {
     $result = $stmt->get_result();
     $board = $result->fetch_assoc();
     $stmt->close();
-    
+
     if (!$board) {
         sendError(404, 'Board not found');
     }
-    
+
     if ($board['token'] !== $token) {
         sendError(403, 'Invalid token');
     }
-    
+
     return $board;
 }
 
@@ -110,11 +107,11 @@ function validateNoteOwnership(int $noteId, int $boardId): array {
     $result = $stmt->get_result();
     $note = $result->fetch_assoc();
     $stmt->close();
-    
+
     if (!$note) {
         sendError(404, 'Note not found');
     }
-    
+
     return $note;
 }
 
@@ -124,11 +121,11 @@ function validateNoteOwnership(int $noteId, int $boardId): array {
 function getJSONBody(): array {
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
-    
+
     if ($data === null && $input !== '') {
         sendError(400, 'Invalid JSON body');
     }
-    
+
     return $data ?? [];
 }
 

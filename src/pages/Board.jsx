@@ -1,34 +1,31 @@
-import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import Canvas from '../components/Canvas';
 import { getBoard, createNote, updateNote, deleteNote } from '../api/boardApi';
 
 /**
  * Página Board - Maneja el estado del tablero
- * 
- * URL: /board/:id?token=xxx
+ *
+ * URL: /board/:id
  */
 export default function Board() {
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
 
   const [board, setBoard] = useState(null);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Cargar tablero al montar
   useEffect(() => {
     async function loadBoard() {
-      if (!id || !token) {
-        setError('Falta ID de tablero o token en la URL');
+      if (!id) {
+        setError('Falta ID de tablero en la URL');
         setLoading(false);
         return;
       }
 
       try {
-        const data = await getBoard(id, token);
+        const data = await getBoard(id);
         setBoard(data.board);
         setNotes(data.notes || []);
         setError(null);
@@ -40,55 +37,47 @@ export default function Board() {
     }
 
     loadBoard();
-  }, [id, token]);
-
-  // === Handlers ===
+  }, [id]);
 
   const handleCreateNote = async (x, y) => {
     try {
-      const newNote = await createNote(token, {
-        board_id: parseInt(id),
+      const newNote = await createNote({
+        board_id: Number.parseInt(id, 10),
         x: Math.round(x),
         y: Math.round(y),
       });
-      setNotes(prev => [...prev, newNote]);
+      setNotes((prev) => [...prev, newNote]);
     } catch (err) {
       console.error('Error al crear nota:', err);
-      alert('Error al crear nota: ' + err.message);
+      alert(`Error al crear nota: ${err.message}`);
     }
   };
 
   const handleUpdateNote = async (noteId, updates) => {
-    // Guardar estado previo para rollback
     const previousNotes = notes;
 
-    // Actualizar localmente de inmediato (optimistic update)
-    setNotes(prev =>
-      prev.map(note =>
-        note.id === noteId ? { ...note, ...updates } : note
-      )
+    setNotes((prev) =>
+      prev.map((note) => (note.id === noteId ? { ...note, ...updates } : note))
     );
 
-    // Persistir en backend
     try {
-      const updatedNote = await updateNote(token, noteId, updates);
-      setNotes(prev =>
-        prev.map(note => note.id === noteId ? updatedNote : note)
+      const updatedNote = await updateNote(noteId, updates);
+      setNotes((prev) =>
+        prev.map((note) => (note.id === noteId ? updatedNote : note))
       );
     } catch (err) {
       console.error('Error al actualizar nota:', err);
-      // Rollback: restaurar estado previo
       setNotes(previousNotes);
     }
   };
 
   const handleDeleteNote = async (noteId) => {
     try {
-      await deleteNote(token, noteId);
-      setNotes(prev => prev.filter(note => note.id !== noteId));
+      await deleteNote(noteId);
+      setNotes((prev) => prev.filter((note) => note.id !== noteId));
     } catch (err) {
       console.error('Error al eliminar nota:', err);
-      alert('Error al eliminar nota: ' + err.message);
+      alert(`Error al eliminar nota: ${err.message}`);
     }
   };
 
@@ -96,8 +85,6 @@ export default function Board() {
     const maxZ = notes.reduce((max, note) => Math.max(max, note.z_index || 1), 0);
     handleUpdateNote(noteId, { z_index: maxZ + 1 });
   };
-
-  // === Render ===
 
   if (loading) {
     return (
@@ -128,7 +115,7 @@ export default function Board() {
       }}>
         <div>Error: {error}</div>
         <div style={{ fontSize: '14px', color: '#666' }}>
-          URL esperada: /board/ID?token=TOKEN
+          URL esperada: /board/ID
         </div>
       </div>
     );
@@ -136,7 +123,6 @@ export default function Board() {
 
   return (
     <div className="board-page">
-      {/* Header simple */}
       <header style={{
         position: 'fixed',
         top: 0,
@@ -150,12 +136,12 @@ export default function Board() {
         padding: '0 16px',
         zIndex: 10000,
       }}>
-        <h1 style={{ 
-          margin: 0, 
+        <h1 style={{
+          margin: 0,
           fontSize: '18px',
           fontWeight: 500,
         }}>
-          {board?.title || 'IdeaBoard'}
+          {board?.title || 'ideas'}
         </h1>
         <span style={{
           marginLeft: 'auto',
@@ -166,7 +152,6 @@ export default function Board() {
         </span>
       </header>
 
-      {/* Canvas con padding para header */}
       <main style={{ paddingTop: '48px' }}>
         <Canvas
           notes={notes}
