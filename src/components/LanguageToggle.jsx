@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
 import { useUi } from '../hooks/useUi';
+import { GB, PE } from 'country-flag-icons/react/3x2';
+
+const FLAG_COMPONENTS = {
+  es: PE,
+  en: GB,
+};
 
 export default function LanguageToggle() {
   const { ui, language, setLanguage, t } = useUi();
@@ -30,6 +36,7 @@ export default function LanguageToggle() {
     }}>
       {languageEntries.map(([code, info]) => {
         const isActive = code === language;
+        const FlagIcon = FLAG_COMPONENTS[code];
         return (
           <button
             key={code}
@@ -54,7 +61,19 @@ export default function LanguageToggle() {
               transition: 'all 0.15s ease',
             }}
           >
-            <span aria-hidden="true">{info.flag}</span>
+            {FlagIcon ? (
+              <span aria-hidden="true" style={{
+                width: '18px',
+                height: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <FlagIcon title="" />
+              </span>
+            ) : (
+              <span aria-hidden="true">{info.flag}</span>
+            )}
             <span style={{
               fontSize: '11px',
               letterSpacing: '0.08em',
