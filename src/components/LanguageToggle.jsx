@@ -39,14 +39,15 @@ export default function LanguageToggle() {
             aria-label={t('language.switchTo', { language: info.label })}
             title={t('language.switchTo', { language: info.label })}
             style={{
-              width: '32px',
               height: '32px',
-              borderRadius: '50%',
+              padding: '0 10px',
+              borderRadius: '999px',
               border: isActive ? '1px solid #333' : '1px solid transparent',
               backgroundColor: isActive ? '#fff' : 'transparent',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: '6px',
               fontSize: '16px',
               cursor: isActive ? 'default' : 'pointer',
               opacity: isActive ? 1 : 0.7,
@@ -54,6 +55,14 @@ export default function LanguageToggle() {
             }}
           >
             <span aria-hidden="true">{info.flag}</span>
+            <span style={{
+              fontSize: '11px',
+              letterSpacing: '0.08em',
+              fontWeight: 600,
+              color: '#333',
+            }}>
+              {info.label}
+            </span>
           </button>
         );
       })}
